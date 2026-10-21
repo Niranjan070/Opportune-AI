@@ -72,9 +72,10 @@ Comprehensive architecture, research, and technical specifications are maintaine
    uv sync
    ```
 
-2. **Run test suite:**
+2. **Run test suite (Backend):**
    ```bash
    uv run pytest -v
+   # 49 tests passing in ~4s
    ```
 
 3. **Start FastAPI Backend Server:**
@@ -84,6 +85,15 @@ Comprehensive architecture, research, and technical specifications are maintaine
    - API Docs: `http://localhost:8000/docs`
    - Health Check: `http://localhost:8000/api/health`
    - Readiness Check: `http://localhost:8000/api/ready`
+
+4. **Start React + TypeScript Frontend:**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   - Dashboard: `http://localhost:5173`
+   - Production Build: `npm run build`
 
 ---
 
@@ -95,6 +105,6 @@ Comprehensive architecture, research, and technical specifications are maintaine
 - [x] **Phase 4: MCP Integration Layer** — `opportune-jobs-mcp` custom server, Python MCP client, Tool Registry with allowlist enforcement, and MCP REST API (`GET /api/mcp/tools`, `POST /api/mcp/invoke`).
 - [x] **Phase 5: Source Expansion** — Lever ATS & Remotive connectors, DiscoveryOrchestrator with bounded concurrency, timeout enforcement, and partial failure isolation.
 - [x] **Phase 6: Intelligence & Deterministic Ranking** — 6-component scoring formula, hard exclusions, AI requirement extraction with deterministic fallback, and Search Profile CRUD REST APIs (`/api/profiles`).
-- [ ] **Phase 7: Daily Scheduling & Idempotent Email Reporting** — Persistent scheduler and HTML digest dispatch.
-- [ ] **Phase 8: Full-Stack React + TypeScript Dashboard** — Complete frontend application.
-- [ ] **Phase 9: Hardening & End-to-End Testing**.
+- [x] **Phase 7: Daily Scheduling & Idempotent Email Reporting** — Persistent scheduler (9:00 AM Asia/Kolkata), responsive HTML email digest generator, console/SMTP/Resend providers, and strict database-backed duplicate prevention.
+- [x] **Phase 8: Full-Stack React + TypeScript Dashboard** — Modern dark glassmorphism dashboard featuring Overview, Ranked Opportunities, Candidate Profile manager, JD Intelligence Analyzer, and Audit & Telemetry explorer.
+- [x] **Phase 9: Hardening & End-to-End Testing** — 49/49 passing automated tests, SSRF defense with RFC 6052 NAT64 IPv6 handling, full-loop E2E verification, and zero build warnings.

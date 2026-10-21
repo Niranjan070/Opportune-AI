@@ -105,7 +105,6 @@ export const api = {
   // Job Description Intelligence Extraction
   async analyzeJobDescription(rawText: string, title?: string): Promise<{
     extracted_criteria: ExtractedCriteria;
-    saved_id?: string;
   }> {
     const res = await fetch(`${API_BASE}/profiles/analyze-jd`, {
       method: 'POST',
@@ -113,7 +112,8 @@ export const api = {
       body: JSON.stringify({ raw_text: rawText, title }),
     });
     if (!res.ok) throw new Error('Failed to analyze job description');
-    return res.json();
+    const data: ExtractedCriteria = await res.json();
+    return { extracted_criteria: data };
   },
 
   // MCP Registry
