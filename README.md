@@ -94,7 +94,7 @@ Comprehensive architecture, research, and technical specifications are maintaine
 - [x] **Phase 3: First Working Job Sources** — Arbeitnow & Greenhouse live connectors, SSRF protection, NormalizationService, JobStorageService, and Jobs REST API (`GET /api/jobs`, `POST /api/jobs/sync`).
 - [x] **Phase 4: MCP Integration Layer** — `opportune-jobs-mcp` custom server, Python MCP client, Tool Registry with allowlist enforcement, and MCP REST API (`GET /api/mcp/tools`, `POST /api/mcp/invoke`).
 - [x] **Phase 5: Source Expansion** — Lever ATS & Remotive connectors, DiscoveryOrchestrator with bounded concurrency, timeout enforcement, and partial failure isolation.
-- [ ] **Phase 6: Intelligence & Deterministic Ranking** — 6-component scoring formula and deduplication engine.
+- [x] **Phase 6: Intelligence & Deterministic Ranking** — 6-component scoring formula, hard exclusions, AI requirement extraction with deterministic fallback, and Search Profile CRUD REST APIs (`/api/profiles`).
 - [ ] **Phase 7: Daily Scheduling & Idempotent Email Reporting** — Persistent scheduler and HTML digest dispatch.
 - [ ] **Phase 8: Full-Stack React + TypeScript Dashboard** — Complete frontend application.
 - [ ] **Phase 9: Hardening & End-to-End Testing**.

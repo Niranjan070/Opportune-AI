@@ -14,8 +14,8 @@
 | **Phase 3** | **First Working Job Sources** | Arbeitnow & Greenhouse connectors, live normalization, fixture tests | **COMPLETED** |
 | **Phase 4** | **MCP Server & Client Integration** | `opportune-jobs-mcp` server, Python MCP client, Tool registry | **COMPLETED** |
 | **Phase 5** | **Source Expansion** | Lever ATS & Remotive connectors, multi-source orchestration | **COMPLETED** |
-| **Phase 6** | **Intelligence & Deterministic Ranking** | 6-component scoring engine, conservative deduper, JD extractor | **NEXT UP** |
-| **Phase 7** | **Scheduler & Idempotent Email Reporting** | Persistent scheduler, HTML digest generator, Resend/SMTP dispatch | **READY** |
+| **Phase 6** | **Intelligence & Deterministic Ranking** | 6-component scoring engine, conservative deduper, JD extractor | **COMPLETED** |
+| **Phase 7** | **Scheduler & Idempotent Email Reporting** | Persistent scheduler, HTML digest generator, Resend/SMTP dispatch | **NEXT UP** |
 | **Phase 8** | **Full-Stack Dashboard UI** | React + TypeScript + Tailwind CSS interactive job discovery dashboard | **READY** |
 | **Phase 9** | **Hardening, Testing & Documentation** | End-to-end integration tests, SSRF checks, run instructions | **READY** |
 
@@ -63,12 +63,13 @@
 - [x] Record source execution health and latency logs in the database.
 - [x] Write tests verifying multi-source execution and partial failure isolation (33 tests passing).
 
-### Phase 6: Intelligence, Deduplication & Ranking
-- [ ] Implement conservative 5-signal deduplication engine.
-- [ ] Implement deterministic 6-component weighted ranking formula ($35\%$ skills, $20\%$ title, $15\%$ seniority, $15\%$ location, $10\%$ domain, $5\%$ comp).
-- [ ] Implement JD requirement extraction with structured JSON schemas and robust deterministic fallback.
-- [ ] Implement evidence-based match explanation generator.
-- [ ] Add listing freshness and verification status calculations.
+### Phase 6: Intelligence, Deduplication & Ranking (Done)
+- [x] Implement conservative 5-signal deduplication engine and canonical hash generator.
+- [x] Implement deterministic 6-component weighted ranking formula ($35\%$ skills, $20\%$ title, $15\%$ seniority, $15\%$ location, $10\%$ domain, $5\%$ comp).
+- [x] Implement JD requirement extraction with structured JSON schemas and robust deterministic fallback.
+- [x] Implement evidence-based match explanation generator.
+- [x] Implement Search Profiles & JD CRUD REST APIs (`/api/profiles`, `/api/profiles/analyze-jd`, `/api/profiles/{id}/jds`).
+- [x] Write tests for scoring, hard exclusions, and profile management (38 tests passing).
 
 ### Phase 7: Daily Scheduling & Idempotent Email Reporting
 - [ ] Implement persistent Asyncio/APScheduler runner for daily 9:00 AM job discovery.

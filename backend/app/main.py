@@ -11,6 +11,7 @@ from backend.app.database import init_db
 from backend.app.api.routes_health import router as health_router
 from backend.app.api.routes_jobs import router as jobs_router
 from backend.app.api.routes_mcp import router as mcp_router
+from backend.app.api.routes_profiles import router as profiles_router
 
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
@@ -50,6 +51,7 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(mcp_router, prefix="/api")
+app.include_router(profiles_router, prefix="/api")
 
 
 @app.get("/")
