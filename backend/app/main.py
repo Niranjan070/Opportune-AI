@@ -3,6 +3,14 @@ Opportune AI — FastAPI Application Entrypoint
 """
 from contextlib import asynccontextmanager
 import logging
+from pathlib import Path
+import sys
+
+# Ensure project root is in sys.path whether run from project root or backend directory
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
