@@ -83,31 +83,24 @@ def test_score_breakdown_schema():
     assert score.total_score == 88.5
 
 
-def test_database_model_operations():
-    db = SessionLocal()
-    try:
-        # Create a test search profile
-        profile = SearchProfile(
-            name="Backend AI Engineer Profile",
-            target_titles=["AI Engineer", "Backend Developer"],
-            skills=["Python", "FastAPI", "PostgreSQL"],
-            workplace_preference="remote",
-        )
-        db.add(profile)
-        db.commit()
-        db.refresh(profile)
+def test_database_model_operations(db_session):
+    db = db_session
+    # Create a test search profile
+    profile = SearchProfile(
+        name="Backend AI Engineer Profile",
+        target_titles=["AI Engineer", "Backend Developer"],
+        skills=["Python", "FastAPI", "PostgreSQL"],
+        workplace_preference="remote",
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
 
-        assert profile.id is not None
-        assert profile.name == "Backend AI Engineer Profile"
-        assert "Python" in profile.skills
+    assert profile.id is not None
+    assert profile.name == "Backend AI Engineer Profile"
+    assert "Python" in profile.skills
 
-        # Query back
-        fetched = db.query(SearchProfile).filter(SearchProfile.id == profile.id).first()
-        assert fetched is not None
-        assert fetched.name == "Backend AI Engineer Profile"
-
-        # Clean up
-        db.delete(profile)
-        db.commit()
-    finally:
-        db.close()
+    # Query back
+    fetched = db.query(SearchProfile).filter(SearchProfile.id == profile.id).first()
+    assert fetched is not None
+    assert fetched.name == "Backend AI Engineer Profile"

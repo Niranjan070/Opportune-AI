@@ -10,9 +10,9 @@
 | Phase | Milestone Title | Key Deliverables | Status |
 |:---:|---|---|:---:|
 | **Phase 1** | **Repository & Integration Research** | Research docs, Inventory, ADRs, PRD, Architecture, Data Model | **COMPLETED** |
-| **Phase 2** | **Foundation Setup** | FastAPI backend, SQLAlchemy models, Pydantic schemas, Health check | **IN PROGRESS** |
-| **Phase 3** | **First Working Job Sources** | Arbeitnow & Greenhouse connectors, live normalization, fixture tests | **READY** |
-| **Phase 4** | **MCP Server & Client Integration** | `opportune-jobs-mcp` server, Python MCP client, Tool registry | **READY** |
+| **Phase 2** | **Foundation Setup** | FastAPI backend, SQLAlchemy models, Pydantic schemas, Health check | **COMPLETED** |
+| **Phase 3** | **First Working Job Sources** | Arbeitnow & Greenhouse connectors, live normalization, fixture tests | **COMPLETED** |
+| **Phase 4** | **MCP Server & Client Integration** | `opportune-jobs-mcp` server, Python MCP client, Tool registry | **NEXT UP** |
 | **Phase 5** | **Source Expansion** | Lever ATS & Remotive connectors, multi-source orchestration | **READY** |
 | **Phase 6** | **Intelligence & Deterministic Ranking** | 6-component scoring engine, conservative deduper, JD extractor | **READY** |
 | **Phase 7** | **Scheduler & Idempotent Email Reporting** | Persistent scheduler, HTML digest generator, Resend/SMTP dispatch | **READY** |
@@ -34,18 +34,20 @@
 - [x] Create `docs/DATA_MODEL.md`.
 - [x] Create `docs/IMPLEMENTATION_PLAN.md`.
 
-### Phase 2: Foundation (Immediate Next Step)
-- [ ] Initialize Python backend with `uv` virtual environment.
-- [ ] Implement core Pydantic v2 schemas (`NormalizedJob`, `SearchProfile`, `SearchRun`, `ScoredJob`).
-- [ ] Implement SQLAlchemy 2.0 ORM models and database session manager (SQLite default with PostgreSQL support).
-- [ ] Implement FastAPI application with health check endpoints (`/api/health`, `/api/ready`).
-- [ ] Establish pytest test suite with test fixtures.
+### Phase 2: Foundation (Done)
+- [x] Initialize Python backend with `uv` virtual environment.
+- [x] Implement core Pydantic v2 schemas (`NormalizedJob`, `SearchProfile`, `SearchRun`, `ScoredJob`).
+- [x] Implement SQLAlchemy 2.0 ORM models and database session manager (SQLite default with PostgreSQL support).
+- [x] Implement FastAPI application with health check endpoints (`/api/health`, `/api/ready`).
+- [x] Establish pytest test suite with test fixtures.
 
-### Phase 3: First Working Job Sources
-- [ ] Implement `ArbeitnowConnector` with pagination and HTML tag extraction.
-- [ ] Implement `GreenhouseConnector` with company board token lookup and requisition parsing.
-- [ ] Implement `NormalizationService` guaranteeing consistent `NormalizedJob` output.
-- [ ] Write unit tests with real recorded fixtures to verify zero-breakage parsing.
+### Phase 3: First Working Job Sources (Done)
+- [x] Implement `ArbeitnowConnector` with pagination and HTML tag extraction.
+- [x] Implement `GreenhouseConnector` with company board token lookup and requisition parsing.
+- [x] Implement `NormalizationService` guaranteeing consistent `NormalizedJob` output and canonical hash.
+- [x] Implement `JobStorageService` with cross-source deduplication and provenance tracking.
+- [x] Implement Jobs API (`GET /api/jobs`, `GET /api/jobs/{id}`, `POST /api/jobs/sync`).
+- [x] Write unit and integration tests with real and fixture data (19 tests passing).
 
 ### Phase 4: MCP Integration Layer
 - [ ] Implement `opportune-jobs-mcp` server using official Python MCP SDK (`mcp`).

@@ -91,7 +91,7 @@ Comprehensive architecture, research, and technical specifications are maintaine
 
 - [x] **Phase 1: Research & Discovery** — MCP inventory, source research, ADRs, PRD, architecture, and data model.
 - [x] **Phase 2: Foundation** — FastAPI backend, Pydantic v2 schemas, SQLAlchemy models, database initialization, health endpoints, and foundation test suite.
-- [ ] **Phase 3: First Working Job Sources** — Arbeitnow & Greenhouse live connectors and normalization tests.
+- [x] **Phase 3: First Working Job Sources** — Arbeitnow & Greenhouse live connectors, SSRF protection, NormalizationService, JobStorageService, and Jobs REST API (`GET /api/jobs`, `POST /api/jobs/sync`).
 - [ ] **Phase 4: MCP Integration Layer** — `opportune-jobs-mcp` custom server, Python MCP client, and tool registry.
 - [ ] **Phase 5: Source Expansion** — Lever & Remotive connectors and orchestrator.
 - [ ] **Phase 6: Intelligence & Deterministic Ranking** — 6-component scoring formula and deduplication engine.
