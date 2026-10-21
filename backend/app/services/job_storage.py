@@ -155,3 +155,38 @@ class JobStorageService:
         Retrieve single job by ID with linked sources.
         """
         return db.query(Job).options(joinedload(Job.sources)).filter(Job.id == job_id).first()
+
+    @classmethod
+    def job_to_normalized(cls, job: Job) -> NormalizedJob:
+        """
+        Convert a database Job record into a NormalizedJob schema for scoring.
+        """
+        from backend.app.schemas.job import EmploymentType, WorkplaceType
+
+        wp = WorkplaceType.UNKNOWN
+        for member in WorkplaceType:
+            if member.value == (job.workplace_type or "").lower():
+                wp = member
+                break
+
+        emp = EmploymentType.UNKNOWN
+        for member in EmploymentType:
+            if member.value == (job.employment_type or "").lower():
+                emp = member
+                break
+
+        return NormalizedJob(
+            source="canonical",
+            source_job_id=job.id,
+            title=job.title,
+            company=job.company,
+            location=job.location,
+            workplace_type=wp,
+            employment_type=emp,
+            description=job.description,
+            job_url=job.primary_url,
+            posted_at=job.posted_at,
+            salary_min=job.salary_min,
+            salary_max=job.salary_max,
+            currency=job.currency,
+        )

@@ -12,6 +12,8 @@ from backend.app.api.routes_health import router as health_router
 from backend.app.api.routes_jobs import router as jobs_router
 from backend.app.api.routes_mcp import router as mcp_router
 from backend.app.api.routes_profiles import router as profiles_router
+from backend.app.api.routes_runs import router as runs_router
+from backend.app.services.scheduler import job_scheduler
 
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
@@ -26,8 +28,14 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database schemas...")
     init_db()
     logger.info("Database initialized successfully.")
+    if settings.SCHEDULE_ENABLED:
+        logger.info("Starting background JobScheduler...")
+        job_scheduler.start()
     yield
     # Shutdown
+    if settings.SCHEDULE_ENABLED:
+        logger.info("Stopping background JobScheduler...")
+        job_scheduler.stop()
     logger.info("Application shutting down.")
 
 
@@ -52,6 +60,7 @@ app.include_router(health_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(mcp_router, prefix="/api")
 app.include_router(profiles_router, prefix="/api")
+app.include_router(runs_router, prefix="/api")
 
 
 @app.get("/")

@@ -29,6 +29,8 @@ class SearchProfileBase(BaseModel):
     excluded_keywords: List[str] = Field(default_factory=list)
     enabled_sources: List[str] = Field(default_factory=lambda: ["arbeitnow", "greenhouse", "lever", "remotive"])
     target_ats_companies: List[str] = Field(default_factory=lambda: ["gitlab", "figma", "stripe", "airbnb", "palantir"])
+    email_digest_enabled: bool = True
+    notification_email: Optional[str] = None
     is_active: bool = True
 
 
@@ -48,6 +50,8 @@ class SearchProfileUpdate(BaseModel):
     excluded_keywords: Optional[List[str]] = None
     enabled_sources: Optional[List[str]] = None
     target_ats_companies: Optional[List[str]] = None
+    email_digest_enabled: Optional[bool] = None
+    notification_email: Optional[str] = None
     is_active: Optional[bool] = None
 
 

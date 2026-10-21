@@ -1,6 +1,7 @@
 """
 Pydantic Schemas for Deterministic Scoring and Explanations
 """
+from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
@@ -47,4 +48,4 @@ class ScoredJobResponse(BaseModel):
     missing_skills: List[str] = Field(default_factory=list)
     explanation: str
     is_new_for_user: bool = True
-    created_at: str
+    created_at: datetime

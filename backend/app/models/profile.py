@@ -23,6 +23,8 @@ class SearchProfile(Base):
     excluded_keywords = Column(JSON, default=list)
     enabled_sources = Column(JSON, default=lambda: ["arbeitnow", "greenhouse", "lever", "remotive"])
     target_ats_companies = Column(JSON, default=lambda: ["gitlab", "figma", "stripe", "airbnb", "palantir"])
+    email_digest_enabled = Column(Boolean, default=True)
+    notification_email = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

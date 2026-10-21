@@ -48,6 +48,26 @@ class SearchRunResponse(BaseModel):
     error_message: Optional[str] = None
 
 
+class EmailDispatchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    search_run_id: str
+    recipient_email: str
+    idempotency_key: str
+    status: str
+    provider: str
+    provider_message_id: Optional[str] = None
+    sent_at: datetime
+
+
+class TriggerRunRequest(BaseModel):
+    search_profile_id: Optional[str] = None
+    send_email: bool = True
+    limit_per_source: int = 50
+
+
 class SearchRunDetailResponse(SearchRunResponse):
     source_logs: List[SourceLogResponse] = Field(default_factory=list)
     top_jobs: List[ScoredJobResponse] = Field(default_factory=list)
+    email_logs: List[EmailDispatchResponse] = Field(default_factory=list)
