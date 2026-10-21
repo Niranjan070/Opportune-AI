@@ -29,9 +29,25 @@ def is_safe_url(url: str) -> bool:
 
         # Resolve IP addresses
         addr_info = socket.getaddrinfo(hostname, None)
+        nat64_prefix = ipaddress.IPv6Network("64:ff9b::/96")
+
         for family, _, _, _, sockaddr in addr_info:
             ip_str = sockaddr[0]
             ip_obj = ipaddress.ip_address(ip_str)
+
+            # Handle RFC 6052 NAT64 prefix (64:ff9b::/96) used by IPv6 networks to route public IPv4
+            if ip_obj.version == 6 and ip_obj in nat64_prefix:
+                translated_v4 = ipaddress.IPv4Address(ip_obj.packed[-4:])
+                if (
+                    translated_v4.is_loopback
+                    or translated_v4.is_private
+                    or translated_v4.is_link_local
+                    or translated_v4.is_reserved
+                    or translated_v4.is_multicast
+                ):
+                    return False
+                continue
+
             if (
                 ip_obj.is_loopback
                 or ip_obj.is_private
