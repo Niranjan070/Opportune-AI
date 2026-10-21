@@ -13,8 +13,8 @@
 | **Phase 2** | **Foundation Setup** | FastAPI backend, SQLAlchemy models, Pydantic schemas, Health check | **COMPLETED** |
 | **Phase 3** | **First Working Job Sources** | Arbeitnow & Greenhouse connectors, live normalization, fixture tests | **COMPLETED** |
 | **Phase 4** | **MCP Server & Client Integration** | `opportune-jobs-mcp` server, Python MCP client, Tool registry | **COMPLETED** |
-| **Phase 5** | **Source Expansion** | Lever ATS & Remotive connectors, multi-source orchestration | **NEXT UP** |
-| **Phase 6** | **Intelligence & Deterministic Ranking** | 6-component scoring engine, conservative deduper, JD extractor | **READY** |
+| **Phase 5** | **Source Expansion** | Lever ATS & Remotive connectors, multi-source orchestration | **COMPLETED** |
+| **Phase 6** | **Intelligence & Deterministic Ranking** | 6-component scoring engine, conservative deduper, JD extractor | **NEXT UP** |
 | **Phase 7** | **Scheduler & Idempotent Email Reporting** | Persistent scheduler, HTML digest generator, Resend/SMTP dispatch | **READY** |
 | **Phase 8** | **Full-Stack Dashboard UI** | React + TypeScript + Tailwind CSS interactive job discovery dashboard | **READY** |
 | **Phase 9** | **Hardening, Testing & Documentation** | End-to-end integration tests, SSRF checks, run instructions | **READY** |
@@ -56,11 +56,12 @@
 - [x] Add MCP REST API endpoints (`GET /api/mcp/tools`, `POST /api/mcp/invoke`).
 - [x] Write tests invoking MCP tools via registry and HTTP (29 tests passing).
 
-### Phase 5: Expanded Source Coverage
-- [ ] Implement `LeverConnector` (Palantir and configured tech employers).
-- [ ] Implement `RemotiveConnector` (Remote tech listings).
-- [ ] Build `DiscoveryOrchestrator` running concurrent, timeout-bounded source queries.
-- [ ] Record source execution health and latency logs in the database.
+### Phase 5: Expanded Source Coverage (Done)
+- [x] Implement `LeverConnector` (Palantir and configured tech employers).
+- [x] Implement `RemotiveConnector` (Remote tech listings).
+- [x] Build `DiscoveryOrchestrator` running concurrent, timeout-bounded source queries.
+- [x] Record source execution health and latency logs in the database.
+- [x] Write tests verifying multi-source execution and partial failure isolation (33 tests passing).
 
 ### Phase 6: Intelligence, Deduplication & Ranking
 - [ ] Implement conservative 5-signal deduplication engine.
