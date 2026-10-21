@@ -12,8 +12,8 @@
 | **Phase 1** | **Repository & Integration Research** | Research docs, Inventory, ADRs, PRD, Architecture, Data Model | **COMPLETED** |
 | **Phase 2** | **Foundation Setup** | FastAPI backend, SQLAlchemy models, Pydantic schemas, Health check | **COMPLETED** |
 | **Phase 3** | **First Working Job Sources** | Arbeitnow & Greenhouse connectors, live normalization, fixture tests | **COMPLETED** |
-| **Phase 4** | **MCP Server & Client Integration** | `opportune-jobs-mcp` server, Python MCP client, Tool registry | **NEXT UP** |
-| **Phase 5** | **Source Expansion** | Lever ATS & Remotive connectors, multi-source orchestration | **READY** |
+| **Phase 4** | **MCP Server & Client Integration** | `opportune-jobs-mcp` server, Python MCP client, Tool registry | **COMPLETED** |
+| **Phase 5** | **Source Expansion** | Lever ATS & Remotive connectors, multi-source orchestration | **NEXT UP** |
 | **Phase 6** | **Intelligence & Deterministic Ranking** | 6-component scoring engine, conservative deduper, JD extractor | **READY** |
 | **Phase 7** | **Scheduler & Idempotent Email Reporting** | Persistent scheduler, HTML digest generator, Resend/SMTP dispatch | **READY** |
 | **Phase 8** | **Full-Stack Dashboard UI** | React + TypeScript + Tailwind CSS interactive job discovery dashboard | **READY** |
@@ -49,11 +49,12 @@
 - [x] Implement Jobs API (`GET /api/jobs`, `GET /api/jobs/{id}`, `POST /api/jobs/sync`).
 - [x] Write unit and integration tests with real and fixture data (19 tests passing).
 
-### Phase 4: MCP Integration Layer
-- [ ] Implement `opportune-jobs-mcp` server using official Python MCP SDK (`mcp`).
-- [ ] Expose tools: `search_job_sources`, `get_company_postings`, `check_source_status`, `verify_job_url`.
-- [ ] Implement FastAPI MCP Client & Tool Registry with strict allowlists, timeouts, and error isolation.
-- [ ] Write tests invoking MCP tools via Stdio / in-process transport.
+### Phase 4: MCP Integration Layer (Done)
+- [x] Implement `opportune-jobs-mcp` server using official Python MCP SDK (`mcp.server.mcpserver.MCPServer`).
+- [x] Expose tools: `search_job_sources`, `get_company_postings`, `check_source_status`, `verify_job_url`.
+- [x] Implement FastAPI MCP Client & Tool Registry with strict allowlists, timeouts, and error isolation.
+- [x] Add MCP REST API endpoints (`GET /api/mcp/tools`, `POST /api/mcp/invoke`).
+- [x] Write tests invoking MCP tools via registry and HTTP (29 tests passing).
 
 ### Phase 5: Expanded Source Coverage
 - [ ] Implement `LeverConnector` (Palantir and configured tech employers).
