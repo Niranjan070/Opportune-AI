@@ -171,7 +171,9 @@ class ChatAgentService:
         tool_records: List[Dict[str, Any]] = []
         all_raw_jobs: List[NormalizedJob] = []
 
-        keywords = " ".join(criteria.get("skills", [])[:3] + criteria.get("roles", [])[:1]).strip() or "Engineer"
+        skills = criteria.get("skills", [])
+        roles = criteria.get("roles", [])
+        primary_keyword = skills[0] if skills else (roles[0] if roles else "Engineer")
         workplace = criteria.get("workplace_type")
         location = criteria.get("locations", [None])[0] if criteria.get("locations") else None
 
@@ -185,13 +187,12 @@ class ChatAgentService:
                         "get_company_postings",
                         {
                             "company_token": company,
-                            "keywords": keywords if len(keywords) < 30 else None,
-                            "workplace_type": workplace if workplace != "any" else None,
-                            "limit": 25,
+                            "keywords": primary_keyword if primary_keyword != "Engineer" else None,
+                            "limit": 30,
                         }
                     )
                     lat = int((time.perf_counter() - start_t) * 1000)
-                    job_dicts = res.get("output", []) if isinstance(res, dict) else []
+                    job_dicts = res.get("data") or res.get("output") or []
                     tool_records.append({
                         "tool": "get_company_postings",
                         "args": {"company": company},
@@ -219,17 +220,17 @@ class ChatAgentService:
             res = await self.mcp_registry.invoke_tool(
                 "search_job_sources",
                 {
-                    "keywords": keywords,
+                    "keywords": primary_keyword,
                     "location": location,
                     "workplace_type": workplace if workplace != "any" else None,
                     "limit": 30,
                 }
             )
             lat = int((time.perf_counter() - start_t) * 1000)
-            job_dicts = res.get("output", []) if isinstance(res, dict) else []
+            job_dicts = res.get("data") or res.get("output") or []
             tool_records.append({
                 "tool": "search_job_sources",
-                "args": {"keywords": keywords, "workplace": workplace},
+                "args": {"keywords": primary_keyword, "workplace": workplace},
                 "latency_ms": lat,
                 "success": res.get("status") == "success",
                 "result_summary": f"Discovered {len(job_dicts)} openings across public job sources",
@@ -242,7 +243,7 @@ class ChatAgentService:
             lat = int((time.perf_counter() - start_t) * 1000)
             tool_records.append({
                 "tool": "search_job_sources",
-                "args": {"keywords": keywords},
+                "args": {"keywords": primary_keyword},
                 "latency_ms": lat,
                 "success": False,
                 "result_summary": f"Error: {str(e)}",
