@@ -26,6 +26,17 @@ from backend.app.schemas.search_run import (
     SearchRunResponse,
     SearchRunDetailResponse,
 )
+from backend.app.schemas.chat import (
+    ToolCallRecord,
+    EmbeddedScoredJob,
+    ChatMessageCreate,
+    ChatMessageResponse,
+    ChatSessionCreate,
+    ChatSessionUpdate,
+    ChatSubscribeRequest,
+    ChatSessionResponse,
+    ChatSessionDetailResponse,
+)
 
 __all__ = [
     "WorkplaceType",
@@ -48,4 +59,13 @@ __all__ = [
     "SourceLogResponse",
     "SearchRunResponse",
     "SearchRunDetailResponse",
+    "ToolCallRecord",
+    "EmbeddedScoredJob",
+    "ChatMessageCreate",
+    "ChatMessageResponse",
+    "ChatSessionCreate",
+    "ChatSessionUpdate",
+    "ChatSubscribeRequest",
+    "ChatSessionResponse",
+    "ChatSessionDetailResponse",
 ]
