@@ -93,7 +93,16 @@ class ChatAgentService:
                     if clean_json.endswith("```"):
                         clean_json = clean_json[:-3]
                     import json
-                    return json.loads(clean_json.strip())
+                    parsed = json.loads(clean_json.strip())
+                    if isinstance(parsed, dict):
+                        # Sanitize fields
+                        if isinstance(parsed.get("workplace_type"), list) or not parsed.get("workplace_type"):
+                            parsed["workplace_type"] = "any"
+                        for list_field in ["roles", "skills", "companies", "locations"]:
+                            val = parsed.get(list_field)
+                            if not isinstance(val, list):
+                                parsed[list_field] = [val] if val else []
+                        return parsed
         except Exception as e:
             logger.warning(f"Gemini criteria extraction call failed: {e}. Falling back to rule engine.")
 
@@ -216,81 +225,113 @@ class ChatAgentService:
 
         skills = criteria.get("skills", [])
         roles = criteria.get("roles", [])
-        primary_keyword = skills[0] if skills else (roles[0] if roles else "Engineer")
+
+        # Smart keyword selection: extract high-yield tokens (e.g. AI, Intern, Python, React)
+        search_terms = []
+        if skills:
+            search_terms.extend(skills[:2])
+        elif roles:
+            first_role = roles[0].lower()
+            if "ai" in first_role:
+                search_terms.append("AI")
+            if "intern" in first_role:
+                search_terms.append("Intern")
+            if not search_terms:
+                search_terms.append(roles[0].split()[0] if roles[0].split() else "Engineer")
+        else:
+            search_terms.append("Engineer")
+
         workplace = criteria.get("workplace_type")
         location = criteria.get("locations", [None])[0] if criteria.get("locations") else None
 
-        # 1. If specific ATS companies were mentioned, call get_company_postings for each
+        # 1. Query target ATS companies (or top companies if none specified)
         target_companies = criteria.get("companies", [])
-        if target_companies:
-            for company in target_companies:
-                start_t = time.perf_counter()
-                try:
-                    res = await self.mcp_registry.invoke_tool(
-                        "get_company_postings",
+        companies_to_query = target_companies if target_companies else ["gitlab", "figma"]
+        primary_kw = search_terms[0] if search_terms else None
+
+        for company in companies_to_query:
+            start_t = time.perf_counter()
+            try:
+                res = await self.mcp_registry.invoke_tool(
+                    "get_company_postings",
+                    {
+                        "company_token": company,
+                        "keywords": primary_kw if primary_kw not in ("Engineer", "Intern") else None,
+                        "limit": 25,
+                    }
+                )
+                lat = int((time.perf_counter() - start_t) * 1000)
+                job_dicts = res.get("data") or res.get("output") or []
+                tool_records.append({
+                    "tool": "get_company_postings",
+                    "args": {"company": company},
+                    "latency_ms": lat,
+                    "success": res.get("status") == "success",
+                    "result_summary": f"Fetched {len(job_dicts)} openings from {company.title()} ATS",
+                })
+
+                for jd in job_dicts:
+                    if isinstance(jd, dict):
+                        all_raw_jobs.append(NormalizedJob(**jd))
+            except Exception as e:
+                lat = int((time.perf_counter() - start_t) * 1000)
+                tool_records.append({
+                    "tool": "get_company_postings",
+                    "args": {"company": company},
+                    "latency_ms": lat,
+                    "success": False,
+                    "result_summary": f"Error querying {company}: {str(e)}",
+                })
+
+        # 2. Query broad permitted public sources via search_job_sources
+        for kw in search_terms:
+            start_t = time.perf_counter()
+            try:
+                res = await self.mcp_registry.invoke_tool(
+                    "search_job_sources",
+                    {
+                        "keywords": kw,
+                        "location": location,
+                        "workplace_type": workplace if workplace != "any" else None,
+                        "limit": 30,
+                    }
+                )
+                lat = int((time.perf_counter() - start_t) * 1000)
+                job_dicts = res.get("data") or res.get("output") or []
+
+                # If no jobs found with strict location, search globally for Remote (Worldwide) matches
+                if len(job_dicts) == 0 and location:
+                    res_global = await self.mcp_registry.invoke_tool(
+                        "search_job_sources",
                         {
-                            "company_token": company,
-                            "keywords": primary_keyword if primary_keyword != "Engineer" else None,
+                            "keywords": kw,
+                            "location": None,
+                            "workplace_type": workplace if workplace != "any" else None,
                             "limit": 30,
                         }
                     )
-                    lat = int((time.perf_counter() - start_t) * 1000)
-                    job_dicts = res.get("data") or res.get("output") or []
-                    tool_records.append({
-                        "tool": "get_company_postings",
-                        "args": {"company": company},
-                        "latency_ms": lat,
-                        "success": res.get("status") == "success",
-                        "result_summary": f"Fetched {len(job_dicts)} openings from {company.title()} ATS",
-                    })
+                    job_dicts = res_global.get("data") or res_global.get("output") or []
 
-                    for jd in job_dicts:
-                        if isinstance(jd, dict):
-                            all_raw_jobs.append(NormalizedJob(**jd))
-                except Exception as e:
-                    lat = int((time.perf_counter() - start_t) * 1000)
-                    tool_records.append({
-                        "tool": "get_company_postings",
-                        "args": {"company": company},
-                        "latency_ms": lat,
-                        "success": False,
-                        "result_summary": f"Error querying {company}: {str(e)}",
-                    })
+                tool_records.append({
+                    "tool": "search_job_sources",
+                    "args": {"keywords": kw, "workplace": workplace},
+                    "latency_ms": lat,
+                    "success": res.get("status") == "success",
+                    "result_summary": f"Discovered {len(job_dicts)} openings for '{kw}'",
+                })
 
-        # 2. Query broad permitted public sources via search_job_sources
-        start_t = time.perf_counter()
-        try:
-            res = await self.mcp_registry.invoke_tool(
-                "search_job_sources",
-                {
-                    "keywords": primary_keyword,
-                    "location": location,
-                    "workplace_type": workplace if workplace != "any" else None,
-                    "limit": 30,
-                }
-            )
-            lat = int((time.perf_counter() - start_t) * 1000)
-            job_dicts = res.get("data") or res.get("output") or []
-            tool_records.append({
-                "tool": "search_job_sources",
-                "args": {"keywords": primary_keyword, "workplace": workplace},
-                "latency_ms": lat,
-                "success": res.get("status") == "success",
-                "result_summary": f"Discovered {len(job_dicts)} openings across public job sources",
-            })
-
-            for jd in job_dicts:
-                if isinstance(jd, dict):
-                    all_raw_jobs.append(NormalizedJob(**jd))
-        except Exception as e:
-            lat = int((time.perf_counter() - start_t) * 1000)
-            tool_records.append({
-                "tool": "search_job_sources",
-                "args": {"keywords": primary_keyword},
-                "latency_ms": lat,
-                "success": False,
-                "result_summary": f"Error: {str(e)}",
-            })
+                for jd in job_dicts:
+                    if isinstance(jd, dict):
+                        all_raw_jobs.append(NormalizedJob(**jd))
+            except Exception as e:
+                lat = int((time.perf_counter() - start_t) * 1000)
+                tool_records.append({
+                    "tool": "search_job_sources",
+                    "args": {"keywords": kw},
+                    "latency_ms": lat,
+                    "success": False,
+                    "result_summary": f"Error: {str(e)}",
+                })
 
         return tool_records, all_raw_jobs
 

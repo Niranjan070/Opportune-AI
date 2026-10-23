@@ -24,9 +24,11 @@ mcp_server = MCPServer(
 )
 
 
+from backend.app.connectors.remotive import RemotiveConnector
+
 @mcp_server.tool(
     name="search_job_sources",
-    description="Discover job openings across permitted public sources (Arbeitnow, etc.) with keyword, location, and workplace filters."
+    description="Discover job openings across permitted public sources (Arbeitnow, Remotive, etc.) with keyword, location, and workplace filters."
 )
 async def search_job_sources(
     keywords: Optional[str] = None,
@@ -35,20 +37,26 @@ async def search_job_sources(
     limit: int = 25,
 ) -> List[Dict[str, Any]]:
     """
-    Search permitted public job sources.
+    Search permitted public job sources (Arbeitnow & Remotive) concurrently.
     """
     results: List[Dict[str, Any]] = []
 
     try:
-        connector = ArbeitnowConnector()
-        jobs = await connector.search(
-            keywords=keywords,
-            location=location,
-            workplace_type=workplace_type,
-            limit=limit,
-        )
-        for j in jobs:
-            results.append(j.model_dump(mode="json"))
+        arb_conn = ArbeitnowConnector()
+        rem_conn = RemotiveConnector()
+
+        tasks = [
+            arb_conn.search(keywords=keywords, location=location, workplace_type=workplace_type, limit=limit),
+            rem_conn.search(keywords=keywords, location=location, workplace_type=workplace_type, limit=limit),
+        ]
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for resp in responses:
+            if isinstance(resp, list):
+                for j in resp:
+                    results.append(j.model_dump(mode="json"))
+            elif isinstance(resp, Exception):
+                logger.warning(f"Source search sub-task error: {resp}")
     except Exception as e:
         logger.error(f"Error executing search_job_sources: {e}", exc_info=True)
 

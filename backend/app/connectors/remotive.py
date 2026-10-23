@@ -80,7 +80,8 @@ class RemotiveConnector(BaseJobConnector):
                     # Filter candidate location
                     if loc_lower and loc_lower != "remote":
                         cand_loc_low = candidate_location.lower()
-                        if cand_loc_low not in ("worldwide", "anywhere") and loc_lower not in cand_loc_low:
+                        is_global = any(w in cand_loc_low for w in ("worldwide", "anywhere", "global", "all", "apac"))
+                        if not is_global and loc_lower not in cand_loc_low:
                             continue
 
                     # Employment type
