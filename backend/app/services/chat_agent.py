@@ -99,6 +99,49 @@ class ChatAgentService:
 
         return None
 
+    async def _generate_conversational_response_with_gemini(
+        self,
+        user_message: str,
+        criteria: Dict[str, Any],
+        top_jobs: List[Dict[str, Any]],
+        total_discovered: int,
+    ) -> Optional[str]:
+        """Synthesize a natural, conversational response using Gemini."""
+        if not settings.GEMINI_API_KEY:
+            return None
+
+        prompt = (
+            "You are Opportune AI, an intelligent conversational AI job discovery assistant designed with the personality and clarity of ChatGPT and Claude.\n"
+            f"Candidate query: {repr(user_message)}\n\n"
+            "Search findings:\n"
+            f"- Extracted Criteria: {criteria}\n"
+            f"- Total Openings Evaluated: {total_discovered}\n"
+            f"- Top Scored Matches: {[{'title': j['title'], 'company': j['company'], 'match_score': j['match_score'], 'location': j['location'], 'matched_skills': j['matched_skills'], 'missing_skills': j['missing_skills']} for j in top_jobs[:4]]}\n\n"
+            "Instructions:\n"
+            "1. Write a direct, intelligent, and warm response (1 to 2 paragraphs).\n"
+            "2. Summarize where you searched (e.g. ATS boards, public feeds) and highlight what makes the top roles attractive.\n"
+            "3. Mention any interesting skill matches or potential trade-offs (e.g. tech stack fit).\n"
+            "4. Do NOT output JSON or repeating card details (the UI renders rich cards automatically below your response).\n"
+            "5. Keep the formatting in clean markdown with bold highlights."
+        )
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.LLM_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.4},
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                res = await client.post(url, json=payload)
+                if res.status_code == 200:
+                    data = res.json()
+                    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except Exception as e:
+            logger.warning(f"Gemini conversational synthesis call failed: {e}")
+
+        return None
+
     def _extract_criteria_rule_based(self, text: str) -> Dict[str, Any]:
         """
         Deterministic rule and regex criteria extractor for offline execution.
@@ -322,24 +365,35 @@ class ChatAgentService:
         total_found = len(raw_jobs)
         top_matches_count = len(top_scored_jobs)
 
-        content_parts = []
-        content_parts.append(f"I searched for **{roles_str}** matching **{skills_str}**.")
+        # Try generating conversational response with Gemini
+        llm_reply = await self._generate_conversational_response_with_gemini(
+            user_message=user_message_text,
+            criteria=merged_criteria,
+            top_jobs=top_scored_jobs,
+            total_discovered=total_found,
+        )
 
-        if companies_str:
-            content_parts.append(f"Targeting company ATS boards: **{companies_str}**.")
-
-        if top_matches_count > 0:
-            content_parts.append(
-                f"Discovered **{total_found} total openings** and evaluated them through our deterministic scoring engine. "
-                f"Here are the **top {top_matches_count} matching opportunities**:"
-            )
+        if llm_reply:
+            assistant_content = llm_reply
         else:
-            content_parts.append(
-                f"I queried the job sources but found no immediate openings perfectly matching these specific constraints. "
-                f"Try broadening the keywords or workplace preferences, or subscribe to receive alerts when matching roles appear!"
-            )
+            content_parts = []
+            content_parts.append(f"I searched for **{roles_str}** matching **{skills_str}**.")
 
-        assistant_content = "\n\n".join(content_parts)
+            if companies_str:
+                content_parts.append(f"Targeting company ATS boards: **{companies_str}**.")
+
+            if top_matches_count > 0:
+                content_parts.append(
+                    f"Discovered **{total_found} total openings** and evaluated them through our deterministic scoring engine. "
+                    f"Here are the **top {top_matches_count} matching opportunities**:"
+                )
+            else:
+                content_parts.append(
+                    f"I queried the job sources but found no immediate openings perfectly matching these specific constraints. "
+                    f"Try broadening the keywords or workplace preferences, or subscribe to receive alerts when matching roles appear!"
+                )
+
+            assistant_content = "\n\n".join(content_parts)
 
         # Step 6: Update ChatSession title if this is the first exchange
         if session.title in ("New Job Search Chat", None, ""):

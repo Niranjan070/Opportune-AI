@@ -52,13 +52,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
   return (
     <div
       style={{
-        padding: '16px 24px 20px 24px',
-        borderTop: '1px solid var(--border-subtle)',
-        background: 'rgba(11, 17, 30, 0.85)',
-        backdropFilter: 'blur(12px)',
+        padding: '16px 20px 20px 20px',
+        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        background: '#090d16',
       }}
     >
-      {/* Suggested Query Chips */}
+      <div style={{ maxWidth: '820px', margin: '0 auto', width: '100%' }}>
+        {/* Suggested Query Chips */}
       <div
         style={{
           display: 'flex',
@@ -169,8 +169,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
           )}
         </button>
       </div>
-      <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '6px', textAlign: 'center' }}>
-        Press <kbd style={{ padding: '1px 4px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px' }}>Enter</kbd> to search &bull; <kbd style={{ padding: '1px 4px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px' }}>Shift + Enter</kbd> for newline
+        <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px', textAlign: 'center' }}>
+          Press <kbd style={{ padding: '1px 4px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px' }}>Enter</kbd> to search &bull; <kbd style={{ padding: '1px 4px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px' }}>Shift + Enter</kbd> for newline
+        </div>
       </div>
     </div>
   );

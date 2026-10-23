@@ -1,24 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Header } from './components/Header';
-import { ChatTab } from './components/ChatTab';
-import { OverviewTab } from './components/OverviewTab';
-import { OpportunitiesTab } from './components/OpportunitiesTab';
-import { ProfileTab } from './components/ProfileTab';
-import { JDAnalyzerTab } from './components/JDAnalyzerTab';
-import { AuditTab } from './components/AuditTab';
-import { JobDetailModal } from './components/JobDetailModal';
+import { PanelLeftOpen, Sparkles } from 'lucide-react';
 import { api } from './services/api';
-import type { ScoredJob, SearchProfile, SearchRun, SearchRunDetail } from './types';
+import type { ChatSession, ScoredJob } from './types';
+import { ChatSidebar } from './components/chat/ChatSidebar';
+import { ChatStream } from './components/chat/ChatStream';
+import { ChatInput } from './components/chat/ChatInput';
+import { JobDetailModal } from './components/JobDetailModal';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('chat');
-  const [isOnline, setIsOnline] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
-  const [runs, setRuns] = useState<SearchRun[]>([]);
-  const [activeRunDetail, setActiveRunDetail] = useState<SearchRunDetail | null>(null);
-  const [scoredJobs, setScoredJobs] = useState<ScoredJob[]>([]);
-  const [totalJobsCount, setTotalJobsCount] = useState(0);
-  const [profile, setProfile] = useState<SearchProfile | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedJob, setSelectedJob] = useState<ScoredJob | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -27,127 +20,162 @@ export const App: React.FC = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Initial load
-  const loadData = useCallback(async () => {
+  // Load chat sessions on startup
+  const loadSessions = useCallback(async (selectSessionId?: string) => {
     try {
-      // 1. Health check
-      await api.getHealth();
-      setIsOnline(true);
+      const data = await api.getChatSessions();
+      setSessions(data);
 
-      // 2. Load Profiles
-      const profiles = await api.getProfiles();
-      if (profiles.length > 0) {
-        setProfile(profiles[0]);
+      if (data.length > 0) {
+        const targetId = selectSessionId || (activeSession ? activeSession.id : data[0].id);
+        const exists = data.find((s) => s.id === targetId);
+        const idToLoad = exists ? targetId : data[0].id;
+        const detail = await api.getChatSessionDetail(idToLoad);
+        setActiveSession(detail);
+      } else {
+        // Create an initial empty session if none exists
+        const newSession = await api.createChatSession({ title: 'New Job Search' });
+        setSessions([newSession]);
+        setActiveSession(newSession);
       }
-
-      // 3. Load Jobs count
-      const jobsData = await api.getJobs({ limit: 1 });
-      setTotalJobsCount(jobsData.total);
-
-      // 4. Load Runs
-      const pastRuns = await api.getSearchRuns(10);
-      setRuns(pastRuns);
-
-      // 5. Load latest Run Detail if available
-      if (pastRuns.length > 0) {
-        const detail = await api.getSearchRunDetail(pastRuns[0].id);
-        setActiveRunDetail(detail);
-        setScoredJobs(detail.top_jobs || []);
-      }
-    } catch (err) {
-      console.error('Error initializing app data:', err);
-      setIsOnline(false);
+    } catch (err: any) {
+      console.error('Failed to load chat sessions:', err);
+      showToast(`Error connecting to server: ${err.message}`);
     }
-  }, []);
+  }, [activeSession]);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(async () => {
-      try {
-        await api.getHealth();
-        setIsOnline(true);
-      } catch {
-        setIsOnline(false);
-      }
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [loadData]);
+    loadSessions();
+  }, []);
 
-  // Trigger manual discovery run
-  const handleTriggerRun = async () => {
-    setIsRunning(true);
-    showToast('Executing multi-source job discovery cycle...');
+  // Switch conversation thread
+  const handleSelectSession = async (sessionId: string) => {
     try {
-      const run = await api.triggerSearchRun({
-        search_profile_id: profile?.id,
-        send_email: profile?.email_digest_enabled ?? true,
-        limit_per_source: 30,
-      });
-
-      // Fetch detail of completed run
-      const detail = await api.getSearchRunDetail(run.id);
-      setActiveRunDetail(detail);
-      setScoredJobs(detail.top_jobs || []);
-
-      // Reload runs list
-      const pastRuns = await api.getSearchRuns(10);
-      setRuns(pastRuns);
-
-      showToast(`Discovery completed! Discovered ${detail.total_discovered} listings, ranked ${detail.total_ranked} opportunities.`);
-      setActiveTab('opportunities');
+      const detail = await api.getChatSessionDetail(sessionId);
+      setActiveSession(detail);
     } catch (err: any) {
-      console.error('Run failed:', err);
-      showToast(`Discovery run failed: ${err.message}`);
-    } finally {
-      setIsRunning(false);
+      showToast(`Error switching chat: ${err.message}`);
     }
   };
 
-  // Update profile
-  const handleSaveProfile = async (updated: Partial<SearchProfile>) => {
-    if (!profile) return;
-    const res = await api.updateProfile(profile.id, updated);
-    setProfile(res);
-  };
-
-  // Append extracted skills from JD Analyzer
-  const handleAppendSkills = async (skillsToAdd: string[]) => {
-    if (!profile) return;
-    const existing = profile.skills || [];
-    const merged = Array.from(new Set([...existing, ...skillsToAdd]));
-    await handleSaveProfile({ skills: merged });
-    showToast(`Added ${skillsToAdd.length} extracted skills to profile!`);
-  };
-
-  // Select a specific past run for inspection
-  const handleSelectRun = async (runId: string) => {
+  // "+ New Chat"
+  const handleNewSession = async () => {
     try {
-      const detail = await api.getSearchRunDetail(runId);
-      setActiveRunDetail(detail);
-      setScoredJobs(detail.top_jobs || []);
+      const created = await api.createChatSession({ title: 'New Job Search' });
+      setSessions((prev) => [created, ...prev]);
+      setActiveSession(created);
     } catch (err: any) {
-      showToast(`Error loading run detail: ${err.message}`);
+      showToast(`Failed to create chat: ${err.message}`);
+    }
+  };
+
+  // Delete conversation
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await api.deleteChatSession(sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      if (activeSession?.id === sessionId) {
+        const remaining = sessions.filter((s) => s.id !== sessionId);
+        if (remaining.length > 0) {
+          const detail = await api.getChatSessionDetail(remaining[0].id);
+          setActiveSession(detail);
+        } else {
+          handleNewSession();
+        }
+      }
+      showToast('Conversation deleted.');
+    } catch (err: any) {
+      showToast(`Failed to delete chat: ${err.message}`);
+    }
+  };
+
+  // Send candidate prompt
+  const handleSendMessage = async (content: string) => {
+    if (!activeSession) return;
+    setIsLoading(true);
+
+    // Optimistically append user message to UI
+    const tempUserMsg = {
+      id: `temp-${Date.now()}`,
+      session_id: activeSession.id,
+      sender: 'user' as const,
+      content,
+      tool_calls: [],
+      scored_jobs: [],
+      created_at: new Date().toISOString(),
+    };
+
+    setActiveSession((prev) =>
+      prev ? { ...prev, messages: [...(prev.messages || []), tempUserMsg] } : null
+    );
+
+    try {
+      await api.sendChatMessage(activeSession.id, content);
+      
+      // Reload session detail with assistant response & updated title
+      const updatedSession = await api.getChatSessionDetail(activeSession.id);
+      setActiveSession(updatedSession);
+
+      // Refresh sidebar list
+      const allSessions = await api.getChatSessions();
+      setSessions(allSessions);
+    } catch (err: any) {
+      console.error('Failed to send message:', err);
+      showToast(`Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Daily Email Digest Subscription
+  const handleSubscribe = async (email: string) => {
+    if (!activeSession) return;
+    try {
+      const updated = await api.subscribeChatToEmail(activeSession.id, email);
+      setActiveSession((prev) => (prev ? { ...prev, is_email_subscribed: true, subscriber_email: email } : null));
+      setSessions((prev) =>
+        prev.map((s) => (s.id === updated.id ? { ...s, is_email_subscribed: true, subscriber_email: email } : s))
+      );
+      showToast(`Subscribed! Daily 9:00 AM alerts will be sent to ${email}`);
+    } catch (err: any) {
+      showToast(`Failed to subscribe: ${err.message}`);
+    }
+  };
+
+  // Unsubscribe
+  const handleUnsubscribe = async () => {
+    if (!activeSession) return;
+    try {
+      const updated = await api.unsubscribeChatFromEmail(activeSession.id);
+      setActiveSession((prev) => (prev ? { ...prev, is_email_subscribed: false } : null));
+      setSessions((prev) =>
+        prev.map((s) => (s.id === updated.id ? { ...s, is_email_subscribed: false } : s))
+      );
+      showToast('Unsubscribed from daily alerts.');
+    } catch (err: any) {
+      showToast(`Failed to unsubscribe: ${err.message}`);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', overflow: 'hidden', background: '#090d16', color: 'var(--text-main)' }}>
       
       {/* Toast Notification */}
       {toastMessage && (
         <div
           style={{
             position: 'fixed',
-            bottom: '24px',
+            top: '20px',
             right: '24px',
-            backgroundColor: 'var(--bg-surface-elevated)',
+            backgroundColor: '#162032',
             border: '1px solid var(--primary)',
             color: 'var(--text-main)',
             padding: '12px 20px',
             borderRadius: '10px',
             fontSize: '13px',
             fontWeight: 600,
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
             zIndex: 9999,
           }}
         >
@@ -155,88 +183,120 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isRunning={isRunning}
-        onTriggerRun={handleTriggerRun}
-        isOnline={isOnline}
-      />
+      {/* Collapsible Left Sidebar */}
+      {sidebarOpen && (
+        <ChatSidebar
+          sessions={sessions}
+          activeSessionId={activeSession?.id || null}
+          onSelectSession={handleSelectSession}
+          onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
+          onToggleSidebar={() => setSidebarOpen(false)}
+        />
+      )}
 
-      {/* Main Content Area */}
-      <main style={{ padding: '0 20px 48px 20px', flex: 1 }}>
-        {activeTab === 'chat' && (
-          <ChatTab
-            onInspectJob={(job) => setSelectedJob(job)}
-            showToast={showToast}
-          />
-        )}
+      {/* Main Chat Interface */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 }}>
+        
+        {/* Minimalist Top Bar */}
+        <header
+          style={{
+            height: '54px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 20px',
+            background: 'rgba(11, 17, 30, 0.8)',
+            backdropFilter: 'blur(10px)',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            {!sidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                title="Open sidebar"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-main)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+              >
+                <PanelLeftOpen size={18} />
+              </button>
+            )}
 
-        {activeTab === 'overview' && (
-          <OverviewTab
-            recentRun={runs[0] || null}
-            totalJobsCount={totalJobsCount}
-            onNavigateToJobs={() => setActiveTab('opportunities')}
-          />
-        )}
+            <h2
+              style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--text-main)',
+                margin: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {activeSession?.title || 'New Job Search'}
+            </h2>
+          </div>
 
-        {activeTab === 'opportunities' && (
-          <OpportunitiesTab
-            scoredJobs={scoredJobs}
-            onSelectJob={(job) => setSelectedJob(job)}
-          />
-        )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '999px',
+                background: 'rgba(99, 102, 241, 0.12)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
+              <Sparkles size={12} color="var(--primary)" />
+              <span>Gemini 2.5 Flash</span>
+            </div>
+          </div>
+        </header>
 
-        {activeTab === 'profile' && (
-          <ProfileTab
-            profile={profile}
-            onSaveProfile={handleSaveProfile}
-          />
-        )}
+        {/* Message Stream */}
+        <ChatStream
+          session={activeSession}
+          isLoading={isLoading}
+          onInspectJob={(job) => setSelectedJob(job)}
+          onSubscribe={handleSubscribe}
+          onUnsubscribe={handleUnsubscribe}
+          onSelectPrompt={handleSendMessage}
+        />
 
-        {activeTab === 'analyzer' && (
-          <JDAnalyzerTab
-            onAppendSkillsToProfile={handleAppendSkills}
-          />
-        )}
+        {/* Bottom Centered Input */}
+        <ChatInput
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+        />
+      </div>
 
-        {activeTab === 'audit' && (
-          <AuditTab
-            runs={runs}
-            activeRunDetail={activeRunDetail}
-            onSelectRun={handleSelectRun}
-            onRefreshRuns={loadData}
-          />
-        )}
-      </main>
-
-      {/* Job Detail Modal */}
+      {/* Job Detail Modal (for deep inspection if user clicks Score Breakdown) */}
       <JobDetailModal
         scoredJob={selectedJob}
         onClose={() => setSelectedJob(null)}
       />
 
-      {/* Footer */}
-      <footer
-        style={{
-          borderTop: '1px solid var(--border-subtle)',
-          padding: '20px',
-          textAlign: 'center',
-          fontSize: '12px',
-          color: 'var(--text-dim)',
-          background: 'rgba(9, 13, 22, 0.8)',
-        }}
-      >
-        <p style={{ margin: '0 0 4px 0' }}>
-          <strong>Opportune AI</strong> &bull; Intelligent Job Discovery & Opportunity Intelligence
-        </p>
-        <p style={{ margin: 0 }}>
-          Deterministic ranking across permitted sources. No automated applications are ever submitted on your behalf.
-        </p>
-      </footer>
-
     </div>
   );
 };
+
 export default App;
