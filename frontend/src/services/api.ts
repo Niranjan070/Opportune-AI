@@ -8,6 +8,8 @@ import type {
   SearchProfile,
   SearchRun,
   SearchRunDetail,
+  ChatSession,
+  ChatMessage,
 } from '../types';
 
 const API_BASE = '/api';
@@ -120,6 +122,64 @@ export const api = {
   async getMCPTools(): Promise<MCPToolInfo[]> {
     const res = await fetch(`${API_BASE}/mcp/tools`);
     if (!res.ok) throw new Error('Failed to fetch MCP tools');
+    return res.json();
+  },
+
+  // Conversational Chat Assistant
+  async getChatSessions(): Promise<ChatSession[]> {
+    const res = await fetch(`${API_BASE}/chat/sessions`);
+    if (!res.ok) throw new Error('Failed to fetch chat sessions');
+    return res.json();
+  },
+
+  async createChatSession(payload?: { title?: string; initial_message?: string }): Promise<ChatSession> {
+    const res = await fetch(`${API_BASE}/chat/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    });
+    if (!res.ok) throw new Error('Failed to create chat session');
+    return res.json();
+  },
+
+  async getChatSessionDetail(sessionId: string): Promise<ChatSession> {
+    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}`);
+    if (!res.ok) throw new Error(`Failed to fetch chat session ${sessionId}`);
+    return res.json();
+  },
+
+  async deleteChatSession(sessionId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete chat session ${sessionId}`);
+  },
+
+  async sendChatMessage(sessionId: string, content: string): Promise<ChatMessage> {
+    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) throw new Error('Failed to send chat message');
+    return res.json();
+  },
+
+  async subscribeChatToEmail(sessionId: string, email: string): Promise<ChatSession> {
+    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) throw new Error('Failed to subscribe chat session to email');
+    return res.json();
+  },
+
+  async unsubscribeChatFromEmail(sessionId: string): Promise<ChatSession> {
+    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}/subscribe`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to unsubscribe chat session from email');
     return res.json();
   },
 };

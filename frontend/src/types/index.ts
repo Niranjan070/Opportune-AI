@@ -135,3 +135,49 @@ export interface MCPToolInfo {
   source: string;
   is_read_only: boolean;
 }
+
+export interface ToolCallRecord {
+  tool: string;
+  args: Record<string, any>;
+  latency_ms: number;
+  success: boolean;
+  result_summary: string;
+}
+
+export interface EmbeddedScoredJob {
+  job_id: string;
+  title: string;
+  company: string;
+  location: string;
+  workplace_type: string;
+  match_score: number;
+  score_tier: string;
+  apply_url: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  score_explanation: string;
+  posted_at?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  sender: 'user' | 'assistant';
+  content: string;
+  tool_calls: ToolCallRecord[];
+  scored_jobs: EmbeddedScoredJob[];
+  created_at: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  search_criteria: Record<string, any>;
+  is_email_subscribed: boolean;
+  subscriber_email?: string;
+  search_profile_id?: string;
+  created_at: string;
+  updated_at: string;
+  message_count?: number;
+  messages?: ChatMessage[];
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Play, RefreshCw, Target, Compass, FileText, History } from 'lucide-react';
+import { Sparkles, Play, RefreshCw, Target, Compass, FileText, History, MessageSquare } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -17,11 +17,12 @@ export const Header: React.FC<HeaderProps> = ({
   isOnline,
 }) => {
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: Compass },
+    { id: 'chat', label: 'AI Assistant Chat', icon: MessageSquare },
     { id: 'opportunities', label: 'Ranked Opportunities', icon: Sparkles },
+    { id: 'overview', label: 'Dashboard', icon: Compass },
     { id: 'profile', label: 'Search Profile', icon: Target },
     { id: 'analyzer', label: 'JD Intelligence', icon: FileText },
-    { id: 'audit', label: 'Execution & Email Logs', icon: History },
+    { id: 'audit', label: 'Execution Logs', icon: History },
   ];
 
   return (

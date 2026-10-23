@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
+import { ChatTab } from './components/ChatTab';
 import { OverviewTab } from './components/OverviewTab';
 import { OpportunitiesTab } from './components/OpportunitiesTab';
 import { ProfileTab } from './components/ProfileTab';
@@ -10,7 +11,7 @@ import { api } from './services/api';
 import type { ScoredJob, SearchProfile, SearchRun, SearchRunDetail } from './types';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('chat');
   const [isOnline, setIsOnline] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [runs, setRuns] = useState<SearchRun[]>([]);
@@ -165,6 +166,13 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main style={{ padding: '0 20px 48px 20px', flex: 1 }}>
+        {activeTab === 'chat' && (
+          <ChatTab
+            onInspectJob={(job) => setSelectedJob(job)}
+            showToast={showToast}
+          />
+        )}
+
         {activeTab === 'overview' && (
           <OverviewTab
             recentRun={runs[0] || null}
