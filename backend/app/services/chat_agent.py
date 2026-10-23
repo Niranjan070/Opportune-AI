@@ -301,7 +301,7 @@ class ChatAgentService:
                     "company": job.company,
                     "location": job.location or "Remote",
                     "workplace_type": job.workplace_type.value if hasattr(job.workplace_type, "value") else str(job.workplace_type),
-                    "match_score": round(breakdown.overall_score, 1),
+                    "match_score": round(breakdown.total_score, 1),
                     "score_tier": breakdown.tier.value if hasattr(breakdown.tier, "value") else str(breakdown.tier),
                     "apply_url": job.job_url,
                     "matched_skills": breakdown.matched_skills,
@@ -372,3 +372,6 @@ class ChatAgentService:
         db.refresh(assistant_msg)
 
         return assistant_msg
+
+
+chat_agent_service = ChatAgentService()

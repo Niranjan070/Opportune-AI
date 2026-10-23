@@ -21,6 +21,7 @@ from backend.app.api.routes_jobs import router as jobs_router
 from backend.app.api.routes_mcp import router as mcp_router
 from backend.app.api.routes_profiles import router as profiles_router
 from backend.app.api.routes_runs import router as runs_router
+from backend.app.api.routes_chat import router as chat_router
 from backend.app.services.scheduler import job_scheduler
 
 logging.basicConfig(
@@ -69,6 +70,7 @@ app.include_router(jobs_router, prefix="/api")
 app.include_router(mcp_router, prefix="/api")
 app.include_router(profiles_router, prefix="/api")
 app.include_router(runs_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 
 
 @app.get("/")
