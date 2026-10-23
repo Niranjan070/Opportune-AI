@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PanelLeftOpen, Sparkles } from 'lucide-react';
+import { PanelLeftOpen, Sparkles, MessageSquare, Compass } from 'lucide-react';
 import { api } from './services/api';
 import type { ChatSession, ScoredJob } from './types';
 import { ChatSidebar } from './components/chat/ChatSidebar';
 import { ChatStream } from './components/chat/ChatStream';
 import { ChatInput } from './components/chat/ChatInput';
 import { JobDetailModal } from './components/JobDetailModal';
+import Demo from './components/ui/demo';
 
 export const App: React.FC = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -14,6 +15,7 @@ export const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedJob, setSelectedJob] = useState<ScoredJob | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'prompt-bond' | 'chat'>('prompt-bond');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -53,6 +55,7 @@ export const App: React.FC = () => {
     try {
       const detail = await api.getChatSessionDetail(sessionId);
       setActiveSession(detail);
+      setViewMode('chat');
     } catch (err: any) {
       showToast(`Error switching chat: ${err.message}`);
     }
@@ -64,6 +67,7 @@ export const App: React.FC = () => {
       const created = await api.createChatSession({ title: 'New Job Search' });
       setSessions((prev) => [created, ...prev]);
       setActiveSession(created);
+      setViewMode('chat');
     } catch (err: any) {
       showToast(`Failed to create chat: ${err.message}`);
     }
@@ -252,6 +256,63 @@ export const App: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* View Mode Segmented Controls */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'rgba(255, 255, 255, 0.05)',
+                padding: '3px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                gap: '2px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode('prompt-bond')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: viewMode === 'prompt-bond' ? 'var(--primary, #6366f1)' : 'transparent',
+                  color: viewMode === 'prompt-bond' ? '#ffffff' : 'var(--text-muted, #94a3b8)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Compass size={13} />
+                <span>Prompt Bond UI</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('chat')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: viewMode === 'chat' ? 'var(--primary, #6366f1)' : 'transparent',
+                  color: viewMode === 'chat' ? '#ffffff' : 'var(--text-muted, #94a3b8)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <MessageSquare size={13} />
+                <span>Chat Assistant</span>
+              </button>
+            </div>
+
             <div
               style={{
                 display: 'flex',
@@ -272,21 +333,30 @@ export const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Message Stream */}
-        <ChatStream
-          session={activeSession}
-          isLoading={isLoading}
-          onInspectJob={(job) => setSelectedJob(job)}
-          onSubscribe={handleSubscribe}
-          onUnsubscribe={handleUnsubscribe}
-          onSelectPrompt={handleSendMessage}
-        />
+        {/* View Mode Rendering: PromptBond Interactive Hero vs Standard Chat */}
+        {viewMode === 'prompt-bond' ? (
+          <div style={{ flex: 1, width: '100%', height: 'calc(100vh - 54px)', overflow: 'hidden', position: 'relative' }}>
+            <Demo />
+          </div>
+        ) : (
+          <>
+            {/* Message Stream */}
+            <ChatStream
+              session={activeSession}
+              isLoading={isLoading}
+              onInspectJob={(job) => setSelectedJob(job)}
+              onSubscribe={handleSubscribe}
+              onUnsubscribe={handleUnsubscribe}
+              onSelectPrompt={handleSendMessage}
+            />
 
-        {/* Bottom Centered Input */}
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-        />
+            {/* Bottom Centered Input */}
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              isLoading={isLoading}
+            />
+          </>
+        )}
       </div>
 
       {/* Job Detail Modal (for deep inspection if user clicks Score Breakdown) */}
