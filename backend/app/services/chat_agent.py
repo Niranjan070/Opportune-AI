@@ -28,6 +28,8 @@ from backend.app.services.location_intelligence import (
 )
 from backend.app.services.query_planner import QueryPlanner
 from backend.app.services.result_merger import merge_and_filter_results, format_source_display
+from backend.app.services.salary_intelligence import SalaryIntelligenceService
+from backend.app.services.company_intelligence import CompanyIntelligenceService
 
 logger = logging.getLogger("chat-agent")
 
@@ -377,10 +379,31 @@ class ChatAgentService:
                 geo_mult = meta.get("geo_multiplier", 1.0)
                 adjusted_score = min(100.0, breakdown.total_score * geo_mult)
 
+                # Extract Salary Intelligence
+                salary_info = SalaryIntelligenceService.extract_salary(
+                    description=job.description,
+                    raw_metadata=job.raw_metadata,
+                    existing_min=job.salary_min,
+                    existing_max=job.salary_max,
+                    existing_currency=job.currency,
+                )
+                salary_display = salary_info.display if salary_info else None
+                salary_min = salary_info.min_amount if salary_info else job.salary_min
+                salary_max = salary_info.max_amount if salary_info else job.salary_max
+                currency = salary_info.currency if salary_info else job.currency
+
+                # Extract Company Intelligence (Clean name & Logo)
+                company_info = CompanyIntelligenceService.enrich_company(
+                    company_name=job.company,
+                    primary_url=job.job_url,
+                )
+                company_logo = company_info.logo_url
+                cleaned_company = company_info.cleaned_name or job.company
+
                 scored_candidates.append({
                     "job_id": job.source_job_id,
                     "title": job.title,
-                    "company": job.company,
+                    "company": cleaned_company,
                     "location": job.location or "Remote",
                     "workplace_type": job.workplace_type.value if hasattr(job.workplace_type, "value") else str(job.workplace_type),
                     "match_score": round(adjusted_score, 1),
@@ -389,6 +412,11 @@ class ChatAgentService:
                     "source": job.source,
                     "source_display": meta.get("source_display", format_source_display(job.source)),
                     "geo_match_reason": meta.get("geo_match_reason", "General match"),
+                    "salary_display": salary_display,
+                    "salary_min": salary_min,
+                    "salary_max": salary_max,
+                    "currency": currency,
+                    "company_logo": company_logo,
                     "matched_skills": breakdown.matched_skills,
                     "missing_skills": breakdown.missing_skills,
                     "score_explanation": breakdown.explanation,

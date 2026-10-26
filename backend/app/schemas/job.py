@@ -86,3 +86,46 @@ class JobResponse(BaseModel):
     last_verified_at: Optional[datetime]
     sources: List[JobSourceRef] = Field(default_factory=list)
     created_at: datetime
+
+
+class SavedJobCreate(BaseModel):
+    job_id: str
+    title: str
+    company: str
+    location: Optional[str] = "Unspecified"
+    workplace_type: Optional[str] = "unknown"
+    apply_url: str
+    source: Optional[str] = "web"
+    source_display: Optional[str] = None
+    match_score: Optional[float] = 0.0
+    score_tier: Optional[str] = "strong"
+    salary_display: Optional[str] = None
+    company_logo: Optional[str] = None
+    matched_skills: List[str] = Field(default_factory=list)
+    missing_skills: List[str] = Field(default_factory=list)
+    score_explanation: Optional[str] = None
+    posted_at: Optional[datetime] = None
+
+
+class SavedJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    job_id: str
+    title: str
+    company: str
+    location: Optional[str] = "Unspecified"
+    workplace_type: Optional[str] = "unknown"
+    apply_url: str
+    source: Optional[str] = "web"
+    source_display: Optional[str] = None
+    match_score: float = 0.0
+    score_tier: str = "strong"
+    salary_display: Optional[str] = None
+    company_logo: Optional[str] = None
+    matched_skills: List[str] = Field(default_factory=list)
+    missing_skills: List[str] = Field(default_factory=list)
+    score_explanation: Optional[str] = None
+    posted_at: Optional[datetime] = None
+    created_at: datetime
+

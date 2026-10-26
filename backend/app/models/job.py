@@ -54,3 +54,27 @@ class JobSourceReference(Base):
     __table_args__ = (
         Index("idx_source_lookup", "source_name", "source_job_id"),
     )
+
+
+class SavedJob(Base):
+    __tablename__ = "saved_jobs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_id = Column(String(255), unique=True, index=True, nullable=False)
+    title = Column(String(255), nullable=False)
+    company = Column(String(255), nullable=False)
+    location = Column(String(255), default="Unspecified")
+    workplace_type = Column(String(50), default="unknown")
+    apply_url = Column(Text, nullable=False)
+    source = Column(String(100), default="web")
+    source_display = Column(String(100), nullable=True)
+    match_score = Column(Float, default=0.0)
+    score_tier = Column(String(50), default="strong")
+    salary_display = Column(String(100), nullable=True)
+    company_logo = Column(String(255), nullable=True)
+    matched_skills = Column(JSON, default=list)
+    missing_skills = Column(JSON, default=list)
+    score_explanation = Column(Text, nullable=True)
+    posted_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+

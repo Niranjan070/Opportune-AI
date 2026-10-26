@@ -23,6 +23,14 @@ class EmbeddedScoredJob(BaseModel):
     match_score: float
     score_tier: str
     apply_url: str
+    source: Optional[str] = None
+    source_display: Optional[str] = None
+    geo_match_reason: Optional[str] = None
+    salary_display: Optional[str] = None
+    salary_min: Optional[float] = None
+    salary_max: Optional[float] = None
+    currency: Optional[str] = None
+    company_logo: Optional[str] = None
     matched_skills: List[str] = Field(default_factory=list)
     missing_skills: List[str] = Field(default_factory=list)
     score_explanation: str = ""

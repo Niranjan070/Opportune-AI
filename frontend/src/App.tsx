@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PanelLeftOpen, Sparkles, MessageSquare, Compass } from 'lucide-react';
+import { PanelLeftOpen, Sparkles, MessageSquare, Compass, Bookmark } from 'lucide-react';
 import { api } from './services/api';
 import type { ChatSession, ScoredJob } from './types';
 import { ChatSidebar } from './components/chat/ChatSidebar';
 import { ChatStream } from './components/chat/ChatStream';
 import { ChatInput } from './components/chat/ChatInput';
 import { JobDetailModal } from './components/JobDetailModal';
+import { SavedJobsModal } from './components/SavedJobsModal';
 import { OpportuneHero } from './components/ui/OpportuneHero';
 
 export const App: React.FC = () => {
@@ -16,6 +17,18 @@ export const App: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<ScoredJob | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'discover' | 'chat'>('discover');
+  const [isSavedJobsOpen, setIsSavedJobsOpen] = useState<boolean>(false);
+  const [savedCount, setSavedCount] = useState<number>(0);
+
+  const refreshSavedCount = async () => {
+    try {
+      const list = await api.getSavedJobs();
+      setSavedCount(list.length);
+    } catch {
+      const local = JSON.parse(localStorage.getItem('opportune_saved_jobs') || '[]');
+      setSavedCount(local.length);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -48,6 +61,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadSessions();
+    refreshSavedCount();
   }, []);
 
   // Switch conversation thread
@@ -313,6 +327,47 @@ export const App: React.FC = () => {
               </button>
             </div>
 
+            {/* Saved Jobs Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsSavedJobsOpen(true);
+                refreshSavedCount();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 11px',
+                borderRadius: '8px',
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.35)',
+                color: '#a5b4fc',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="View your saved job opportunities"
+            >
+              <Bookmark size={13} color="#818cf8" />
+              <span>Saved</span>
+              {savedCount > 0 && (
+                <span
+                  style={{
+                    background: '#4f46e5',
+                    color: '#ffffff',
+                    borderRadius: '999px',
+                    padding: '0.5px 6px',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                  }}
+                >
+                  {savedCount}
+                </span>
+              )}
+            </button>
+
             <div
               style={{
                 display: 'flex',
@@ -370,6 +425,19 @@ export const App: React.FC = () => {
       <JobDetailModal
         scoredJob={selectedJob}
         onClose={() => setSelectedJob(null)}
+      />
+
+      {/* Saved Jobs Modal */}
+      <SavedJobsModal
+        isOpen={isSavedJobsOpen}
+        onClose={() => {
+          setIsSavedJobsOpen(false);
+          refreshSavedCount();
+        }}
+        onInspectJob={(job) => {
+          setIsSavedJobsOpen(false);
+          setSelectedJob(job);
+        }}
       />
 
     </div>

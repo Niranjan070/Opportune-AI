@@ -156,11 +156,38 @@ export interface EmbeddedScoredJob {
   source?: string;
   source_display?: string;
   geo_match_reason?: string;
+  salary_display?: string;
+  salary_min?: number;
+  salary_max?: number;
+  currency?: string;
+  company_logo?: string;
   matched_skills: string[];
   missing_skills: string[];
   score_explanation: string;
   posted_at?: string;
 }
+
+export interface SavedJobItem {
+  id: string;
+  job_id: string;
+  title: string;
+  company: string;
+  location: string;
+  workplace_type: string;
+  apply_url: string;
+  source?: string;
+  source_display?: string;
+  match_score: number;
+  score_tier: string;
+  salary_display?: string;
+  company_logo?: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  score_explanation?: string;
+  posted_at?: string;
+  created_at: string;
+}
+
 
 export interface ChatMessage {
   id: string;

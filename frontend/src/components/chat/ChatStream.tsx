@@ -23,7 +23,7 @@ export const ChatStream: React.FC<ChatStreamProps> = ({
   onSelectPrompt,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'remote' | 'intern' | 'india' | 'high_score'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'remote' | 'intern' | 'india' | 'high_score' | 'salary'>('all');
   const [sortBy, setSortBy] = useState<'score' | 'title'>('score');
   const [loadingStep, setLoadingStep] = useState<number>(0);
 
@@ -65,6 +65,8 @@ export const ChatStream: React.FC<ChatStreamProps> = ({
       });
     } else if (activeFilter === 'high_score') {
       list = list.filter((j) => j.match_score >= 80);
+    } else if (activeFilter === 'salary') {
+      list = list.filter((j) => Boolean(j.salary_display || (j.salary_min && j.salary_min > 0)));
     }
 
     if (sortBy === 'title') {
@@ -271,6 +273,7 @@ export const ChatStream: React.FC<ChatStreamProps> = ({
                         { id: 'india', label: '🇮🇳 India/Local' },
                         { id: 'remote', label: '🌐 Remote' },
                         { id: 'intern', label: '🎓 Internships' },
+                        { id: 'salary', label: '💰 Compensation' },
                         { id: 'high_score', label: '⭐ Score ≥ 80%' },
                       ].map((f) => (
                         <button

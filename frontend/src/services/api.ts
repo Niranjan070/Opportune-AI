@@ -182,4 +182,52 @@ export const api = {
     if (!res.ok) throw new Error('Failed to unsubscribe chat session from email');
     return res.json();
   },
+
+  // Saved Jobs & Bookmarking
+  async getSavedJobs(keyword?: string, source?: string): Promise<import('../types').SavedJobItem[]> {
+    const query = new URLSearchParams();
+    if (keyword) query.set('keyword', keyword);
+    if (source) query.set('source', source);
+    const res = await fetch(`${API_BASE}/jobs/saved?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch saved jobs');
+    return res.json();
+  },
+
+  async saveJob(job: Partial<import('../types').SavedJobItem>): Promise<import('../types').SavedJobItem> {
+    const res = await fetch(`${API_BASE}/jobs/saved`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(job),
+    });
+    if (!res.ok) throw new Error('Failed to save job');
+    return res.json();
+  },
+
+  async deleteSavedJob(jobId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/jobs/saved/${jobId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to remove saved job ${jobId}`);
+  },
+
+  async checkSavedJob(jobId: string): Promise<{ is_saved: boolean }> {
+    const res = await fetch(`${API_BASE}/jobs/saved/check/${jobId}`);
+    if (!res.ok) return { is_saved: false };
+    return res.json();
+  },
+
+  async exportSavedJobsCsv(): Promise<void> {
+    const res = await fetch(`${API_BASE}/jobs/saved/export`);
+    if (!res.ok) throw new Error('Failed to export saved jobs');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `opportune_saved_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
 };
+

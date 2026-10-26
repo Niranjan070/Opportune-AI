@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ExternalLink, Building2, MapPin, Check, Info, Bookmark, BookmarkCheck, Globe } from 'lucide-react';
+import { api } from '../../services/api';
 import type { EmbeddedScoredJob, ScoredJob } from '../../types';
 
 interface EmbeddedJobCardProps {
@@ -16,20 +17,41 @@ export const EmbeddedJobCard: React.FC<EmbeddedJobCardProps> = ({ job, onInspect
       return false;
     }
   });
+  const [logoFailed, setLogoFailed] = useState<boolean>(false);
 
   const toggleSave = () => {
+    const nextSaved = !isSaved;
+    setIsSaved(nextSaved);
+
     try {
       const saved = JSON.parse(localStorage.getItem('opportune_saved_jobs') || '[]');
       let updated;
-      if (isSaved) {
+      if (!nextSaved) {
         updated = saved.filter((id: string) => id !== job.job_id);
+        api.deleteSavedJob(job.job_id).catch(() => {});
       } else {
         updated = [...saved, job.job_id];
+        api.saveJob({
+          job_id: job.job_id,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          workplace_type: job.workplace_type,
+          apply_url: job.apply_url,
+          source: job.source,
+          source_display: sourceBadge.label,
+          match_score: job.match_score,
+          score_tier: job.score_tier,
+          salary_display: job.salary_display,
+          company_logo: job.company_logo,
+          matched_skills: job.matched_skills,
+          missing_skills: job.missing_skills,
+          score_explanation: job.score_explanation,
+        }).catch(() => {});
       }
       localStorage.setItem('opportune_saved_jobs', JSON.stringify(updated));
-      setIsSaved(!isSaved);
     } catch {
-      setIsSaved(!isSaved);
+      // Local fallback handled
     }
   };
 
@@ -201,6 +223,27 @@ export const EmbeddedJobCard: React.FC<EmbeddedJobCardProps> = ({ job, onInspect
                 📍 {job.geo_match_reason}
               </span>
             )}
+
+            {/* Compensation / Salary Intelligence Badge */}
+            {job.salary_display && (
+              <span
+                style={{
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(16, 185, 129, 0.18)',
+                  border: '1px solid rgba(16, 185, 129, 0.4)',
+                  color: '#10b981',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                💰 {job.salary_display}
+              </span>
+            )}
           </div>
 
           <h4
@@ -217,8 +260,24 @@ export const EmbeddedJobCard: React.FC<EmbeddedJobCardProps> = ({ job, onInspect
           </h4>
 
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '14px', fontSize: '13px', color: '#94a3b8' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600, color: '#f1f5f9' }}>
-              <Building2 size={14} color="#818cf8" />
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: '#f1f5f9' }}>
+              {job.company_logo && !logoFailed ? (
+                <img
+                  src={job.company_logo}
+                  alt={job.company}
+                  onError={() => setLogoFailed(true)}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '4px',
+                    objectFit: 'contain',
+                    background: '#ffffff',
+                    padding: '1px',
+                  }}
+                />
+              ) : (
+                <Building2 size={14} color="#818cf8" />
+              )}
               {job.company}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
