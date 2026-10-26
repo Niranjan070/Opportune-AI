@@ -61,7 +61,20 @@ class DeterministicScoringService:
                     missing_skills.append(skill)
             score_skills = (len(matched_skills) / max(len(profile.skills), 1)) * 100.0
         else:
-            score_skills = 75.0  # Neutral if no skills configured
+            # Auto-extract tech skills from job description when no profile skills specified
+            COMMON_TECH_LIST = [
+                "python", "javascript", "typescript", "react", "next.js", "vue",
+                "node.js", "fastapi", "django", "flask", "golang", "go", "rust",
+                "java", "spring boot", "c++", "sql", "postgresql", "docker",
+                "kubernetes", "aws", "gcp", "azure", "pytorch", "tensorflow",
+                "machine learning", "deep learning", "llm", "ai", "nlp", "opencv",
+                "pandas", "numpy", "scikit-learn"
+            ]
+            for skill in COMMON_TECH_LIST:
+                pattern = r"(?<!\w)" + re.escape(skill) + r"(?!\w)"
+                if re.search(pattern, searchable_text):
+                    matched_skills.append(skill.title() if len(skill) > 3 else skill.upper())
+            score_skills = min(100.0, 65.0 + len(matched_skills) * 7.0) if matched_skills else 75.0
 
         # 3. Title Alignment (20%)
         if profile.target_titles:

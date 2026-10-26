@@ -153,6 +153,9 @@ export interface EmbeddedScoredJob {
   match_score: number;
   score_tier: string;
   apply_url: string;
+  source?: string;
+  source_display?: string;
+  geo_match_reason?: string;
   matched_skills: string[];
   missing_skills: string[];
   score_explanation: string;
