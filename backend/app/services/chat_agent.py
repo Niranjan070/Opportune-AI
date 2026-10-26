@@ -20,6 +20,14 @@ from backend.app.schemas.profile import SearchProfileBase
 from backend.app.services.mcp_client import MCPToolRegistry
 from backend.app.services.job_storage import JobStorageService
 from backend.app.services.scorer import DeterministicScoringService
+from backend.app.services.location_intelligence import (
+    INDIAN_CITIES,
+    LocationProfile,
+    resolve_location,
+    compute_geographic_relevance,
+)
+from backend.app.services.query_planner import QueryPlanner
+from backend.app.services.result_merger import merge_and_filter_results, format_source_display
 
 logger = logging.getLogger("chat-agent")
 
@@ -29,7 +37,9 @@ COMMON_TECH_SKILLS = [
     "java", "spring boot", "c++", "c#", ".net", "sql", "postgresql", "mysql",
     "mongodb", "redis", "docker", "kubernetes", "aws", "gcp", "azure", "terraform",
     "graphql", "rest api", "kafka", "rabbitmq", "git", "linux", "pytorch",
-    "tensorflow", "machine learning", "deep learning", "llm", "ai"
+    "tensorflow", "machine learning", "deep learning", "llm", "ai", "nlp",
+    "computer vision", "generative ai", "langchain", "transformers", "huggingface",
+    "scikit-learn", "pandas", "numpy", "opencv"
 ]
 
 KNOWN_ATS_COMPANIES = [
@@ -39,6 +49,8 @@ KNOWN_ATS_COMPANIES = [
 ]
 
 ROLE_KEYWORDS = [
+    "ai engineer intern", "machine learning intern", "data science intern", "software intern",
+    "ai intern", "ml intern", "intern", "internship",
     "software engineer", "backend engineer", "frontend engineer", "full stack engineer",
     "fullstack engineer", "devops engineer", "platform engineer", "site reliability engineer",
     "sre", "machine learning engineer", "data engineer", "data scientist", "ai engineer",
@@ -62,6 +74,7 @@ class ChatAgentService:
             '  "roles": ["list of job titles/roles mentioned or implied"],\n'
             '  "skills": ["list of technical skills/languages/frameworks"],\n'
             '  "companies": ["list of company tokens/slugs lowercase, e.g. gitlab, stripe"],\n'
+            '  "experience_level": "Internship" | "Entry-level" | "Mid-level" | "Senior" | "Any",\n'
             '  "workplace_type": "remote" | "hybrid" | "on_site" | "any",\n'
             '  "locations": ["list of cities, countries, or regions mentioned"],\n'
             '  "min_salary": number or null,\n'
@@ -184,7 +197,16 @@ class ChatAgentService:
             else:
                 roles.append("Software Engineer")
 
-        # 4. Workplace type
+        # 4. Experience Level
+        experience_level = "Any"
+        if re.search(r"\b(intern|internship|trainee|fresher)\b", text_lower):
+            experience_level = "Internship"
+        elif re.search(r"\b(entry|junior|jr|graduate)\b", text_lower):
+            experience_level = "Entry-level"
+        elif re.search(r"\b(senior|sr|lead|principal|staff|architect)\b", text_lower):
+            experience_level = "Senior"
+
+        # 5. Workplace type
         workplace = "any"
         if re.search(r"\b(remote|work from home|telecommute|wfh)\b", text_lower):
             workplace = "remote"
@@ -193,147 +215,117 @@ class ChatAgentService:
         elif re.search(r"\b(on-site|onsite|in-office|office)\b", text_lower):
             workplace = "on_site"
 
-        # 5. Locations
+        # 6. Locations with Location Intelligence
         locations = []
-        for loc in ["germany", "berlin", "europe", "usa", "us", "united states", "india", "london", "uk", "remote", "worldwide"]:
-            if re.search(r"\b" + re.escape(loc) + r"\b", text_lower):
-                locations.append(loc.title())
+        loc_prof = resolve_location(text_lower)
+        if loc_prof.city:
+            locations.append(loc_prof.city)
+        if loc_prof.state and loc_prof.state not in locations:
+            locations.append(loc_prof.state)
+        if loc_prof.country and loc_prof.country not in locations:
+            locations.append(loc_prof.country)
+        if not locations:
+            # Fallback scan for common international regions
+            for loc in ["germany", "berlin", "europe", "usa", "us", "united states", "london", "uk", "remote", "worldwide"]:
+                if re.search(r"\b" + re.escape(loc) + r"\b", text_lower):
+                    locations.append(loc.title())
 
-        # 6. Salary detection (e.g. $140k, 120k, $150,000)
+        # 7. Salary detection (e.g. $140k, 120k, $150,000)
         salary_match = re.search(r"\$?(\d{2,3})k\b", text_lower)
         min_salary = int(salary_match.group(1)) * 1000 if salary_match else None
 
-        summary = f"Search for {', '.join(roles)} with {', '.join(skills[:3]) if skills else 'relevant skills'}"
+        summary = f"Search for {experience_level if experience_level != 'Any' else ''} {', '.join(roles)} with {', '.join(skills[:3]) if skills else 'relevant skills'}"
 
         return {
             "roles": roles,
             "skills": skills,
             "companies": companies,
+            "experience_level": experience_level,
             "workplace_type": workplace,
             "locations": locations,
             "min_salary": min_salary,
             "summary": summary,
         }
 
-    async def _execute_mcp_tools(self, criteria: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[NormalizedJob]]:
+    async def _execute_mcp_tools(
+        self,
+        criteria: Dict[str, Any],
+        raw_user_query: str = "",
+    ) -> Tuple[List[Dict[str, Any]], List[NormalizedJob]]:
         """
-        Call approved MCP tools according to extracted intent.
-        Returns (tool_call_records, normalized_jobs).
+        Dynamically plans and executes approved MCP tools concurrently based on candidate intent.
+        Applies cross-source deduplication and geographic relevance filtering.
         """
         tool_records: List[Dict[str, Any]] = []
-        all_raw_jobs: List[NormalizedJob] = []
+        raw_jobs_collected: List[NormalizedJob] = []
 
-        skills = criteria.get("skills", [])
-        roles = criteria.get("roles", [])
+        # 1. Generate multi-tool search plan
+        plan = QueryPlanner.plan(criteria, raw_user_query=raw_user_query)
 
-        # Smart keyword selection: extract high-yield tokens (e.g. AI, Intern, Python, React)
-        search_terms = []
-        if skills:
-            search_terms.extend(skills[:2])
-        elif roles:
-            first_role = roles[0].lower()
-            if "ai" in first_role:
-                search_terms.append("AI")
-            if "intern" in first_role:
-                search_terms.append("Intern")
-            if not search_terms:
-                search_terms.append(roles[0].split()[0] if roles[0].split() else "Engineer")
-        else:
-            search_terms.append("Engineer")
-
-        workplace = criteria.get("workplace_type")
-        location = criteria.get("locations", [None])[0] if criteria.get("locations") else None
-
-        # 1. Query target ATS companies (or top companies if none specified)
-        target_companies = criteria.get("companies", [])
-        companies_to_query = target_companies if target_companies else ["gitlab", "figma"]
-        primary_kw = search_terms[0] if search_terms else None
-
-        for company in companies_to_query:
+        # 2. Execute planned tools concurrently
+        async def _run_tool(item):
             start_t = time.perf_counter()
             try:
-                res = await self.mcp_registry.invoke_tool(
-                    "get_company_postings",
-                    {
-                        "company_token": company,
-                        "keywords": primary_kw if primary_kw not in ("Engineer", "Intern") else None,
-                        "limit": 25,
-                    }
-                )
-                lat = int((time.perf_counter() - start_t) * 1000)
-                job_dicts = res.get("data") or res.get("output") or []
-                tool_records.append({
-                    "tool": "get_company_postings",
-                    "args": {"company": company},
-                    "latency_ms": lat,
-                    "success": res.get("status") == "success",
-                    "result_summary": f"Fetched {len(job_dicts)} openings from {company.title()} ATS",
-                })
-
-                for jd in job_dicts:
-                    if isinstance(jd, dict):
-                        all_raw_jobs.append(NormalizedJob(**jd))
-            except Exception as e:
-                lat = int((time.perf_counter() - start_t) * 1000)
-                tool_records.append({
-                    "tool": "get_company_postings",
-                    "args": {"company": company},
-                    "latency_ms": lat,
-                    "success": False,
-                    "result_summary": f"Error querying {company}: {str(e)}",
-                })
-
-        # 2. Query broad permitted public sources via search_job_sources
-        for kw in search_terms:
-            start_t = time.perf_counter()
-            try:
-                res = await self.mcp_registry.invoke_tool(
-                    "search_job_sources",
-                    {
-                        "keywords": kw,
-                        "location": location,
-                        "workplace_type": workplace if workplace != "any" else None,
-                        "limit": 30,
-                    }
-                )
+                res = await self.mcp_registry.invoke_tool(item.tool_name, item.arguments)
                 lat = int((time.perf_counter() - start_t) * 1000)
                 job_dicts = res.get("data") or res.get("output") or []
 
-                # If no jobs found with strict location, search globally for Remote (Worldwide) matches
-                if len(job_dicts) == 0 and location:
-                    res_global = await self.mcp_registry.invoke_tool(
-                        "search_job_sources",
-                        {
-                            "keywords": kw,
-                            "location": None,
-                            "workplace_type": workplace if workplace != "any" else None,
-                            "limit": 30,
-                        }
-                    )
-                    job_dicts = res_global.get("data") or res_global.get("output") or []
+                if "company_token" in item.arguments:
+                    summary = f"Fetched {len(job_dicts)} openings from {item.arguments['company_token'].title()} ATS"
+                elif "location" in item.arguments and item.arguments["location"]:
+                    summary = f"Found {len(job_dicts)} openings for '{item.arguments.get('keywords')}' in {item.arguments.get('location')}"
+                else:
+                    summary = f"Discovered {len(job_dicts)} openings via {item.tool_name}"
 
-                tool_records.append({
-                    "tool": "search_job_sources",
-                    "args": {"keywords": kw, "workplace": workplace},
-                    "latency_ms": lat,
-                    "success": res.get("status") == "success",
-                    "result_summary": f"Discovered {len(job_dicts)} openings for '{kw}'",
-                })
-
+                parsed_jobs = []
                 for jd in job_dicts:
                     if isinstance(jd, dict):
-                        all_raw_jobs.append(NormalizedJob(**jd))
+                        try:
+                            parsed_jobs.append(NormalizedJob(**jd))
+                        except Exception:
+                            continue
+
+                return {
+                    "tool": item.tool_name,
+                    "args": item.arguments,
+                    "latency_ms": lat,
+                    "success": res.get("status") == "success",
+                    "result_summary": summary,
+                }, parsed_jobs
             except Exception as e:
                 lat = int((time.perf_counter() - start_t) * 1000)
-                tool_records.append({
-                    "tool": "search_job_sources",
-                    "args": {"keywords": kw},
+                return {
+                    "tool": item.tool_name,
+                    "args": item.arguments,
                     "latency_ms": lat,
                     "success": False,
                     "result_summary": f"Error: {str(e)}",
-                })
+                }, []
 
-        return tool_records, all_raw_jobs
+        tasks = [_run_tool(item) for item in plan]
+        completed = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for outcome in completed:
+            if isinstance(outcome, Exception):
+                logger.error(f"Error during parallel tool execution: {outcome}")
+                continue
+            record, jobs = outcome
+            tool_records.append(record)
+            raw_jobs_collected.extend(jobs)
+
+        # 3. Deduplicate across sources & filter by geographic relevance
+        raw_loc_input = " ".join(criteria.get("locations", [])) if criteria.get("locations") else raw_user_query
+        loc_profile = resolve_location(raw_loc_input)
+        allow_remote = criteria.get("workplace_type") != "on_site"
+
+        merged_jobs = merge_and_filter_results(
+            raw_jobs=raw_jobs_collected,
+            location_profile=loc_profile,
+            allow_remote=allow_remote,
+            max_results=50,
+        )
+
+        return tool_records, merged_jobs
 
     async def process_user_message(
         self,
@@ -344,9 +336,9 @@ class ChatAgentService:
         """
         Full conversational agent pipeline:
         1. Parse intent (Gemini -> fallback)
-        2. Execute MCP tools
+        2. Execute MCP tools (Query Planner -> Concurrent MCP -> Result Merger)
         3. Persist and deduplicate
-        4. Score deterministically
+        4. Score deterministically with location intelligence
         5. Formulate response and save message
         """
         # Step 1: Extract criteria
@@ -359,7 +351,7 @@ class ChatAgentService:
         session.search_criteria = merged_criteria
 
         # Step 2: Execute approved MCP tools
-        tool_records, raw_jobs = await self._execute_mcp_tools(merged_criteria)
+        tool_records, raw_jobs = await self._execute_mcp_tools(merged_criteria, user_message_text)
 
         # Step 3: Persist raw jobs into database with canonical deduplication
         if raw_jobs:
@@ -370,6 +362,7 @@ class ChatAgentService:
             name=session.title or "Chat Session Profile",
             target_titles=merged_criteria.get("roles", []),
             skills=merged_criteria.get("skills", []),
+            experience_level=merged_criteria.get("experience_level", "Any"),
             workplace_preference=merged_criteria.get("workplace_type", "any"),
             preferred_locations=merged_criteria.get("locations", []),
             excluded_employers=[],
@@ -380,15 +373,22 @@ class ChatAgentService:
         for job in raw_jobs:
             breakdown, is_excluded = DeterministicScoringService.evaluate_job(job, profile_spec)
             if not is_excluded:
+                meta = job.raw_metadata or {}
+                geo_mult = meta.get("geo_multiplier", 1.0)
+                adjusted_score = min(100.0, breakdown.total_score * geo_mult)
+
                 scored_candidates.append({
                     "job_id": job.source_job_id,
                     "title": job.title,
                     "company": job.company,
                     "location": job.location or "Remote",
                     "workplace_type": job.workplace_type.value if hasattr(job.workplace_type, "value") else str(job.workplace_type),
-                    "match_score": round(breakdown.total_score, 1),
+                    "match_score": round(adjusted_score, 1),
                     "score_tier": breakdown.tier.value if hasattr(breakdown.tier, "value") else str(breakdown.tier),
                     "apply_url": job.job_url,
+                    "source": job.source,
+                    "source_display": meta.get("source_display", format_source_display(job.source)),
+                    "geo_match_reason": meta.get("geo_match_reason", "General match"),
                     "matched_skills": breakdown.matched_skills,
                     "missing_skills": breakdown.missing_skills,
                     "score_explanation": breakdown.explanation,

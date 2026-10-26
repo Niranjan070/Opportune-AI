@@ -124,11 +124,34 @@ class DeterministicScoringService:
         elif wp_pref in ("any", "all"):
             score_location = 90.0
 
-        # Boost location if preferred locations match
-        if profile.preferred_locations and job.location:
-            job_loc_low = job.location.lower()
-            if any(pl.lower() in job_loc_low for pl in profile.preferred_locations):
-                score_location = min(100.0, score_location + 15.0)
+        # Location matching and penalty for strict geographic mismatches with Location Intelligence
+        if profile.preferred_locations:
+            pref_locs_clean = [pl.lower().strip() for pl in profile.preferred_locations if pl and pl.lower() != "any"]
+            if pref_locs_clean:
+                from backend.app.services.location_intelligence import resolve_location, compute_geographic_relevance
+                target_loc = resolve_location(" ".join(pref_locs_clean))
+                allow_remote = profile.workplace_preference in ("remote", "hybrid", "any", "all")
+                
+                is_acceptable, geo_multiplier, match_reason = compute_geographic_relevance(
+                    job.location,
+                    target_loc,
+                    allow_remote=allow_remote,
+                )
+                
+                if not is_acceptable:
+                    score_location = 5.0
+                elif "city-match" in match_reason:
+                    score_location = 100.0
+                elif "state-match" in match_reason:
+                    score_location = 85.0
+                elif "country" in match_reason:
+                    score_location = 70.0 if target_loc.search_scope == "city" else 95.0
+                elif "remote" in match_reason:
+                    score_location = 75.0 if allow_remote else 30.0
+                else:
+                    score_location = 50.0
+            else:
+                score_location = 85.0
 
         # 6. Domain & Responsibilities (10%)
         score_domain = 80.0

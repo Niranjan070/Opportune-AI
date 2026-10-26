@@ -14,6 +14,7 @@ from backend.app.connectors.arbeitnow import ArbeitnowConnector
 from backend.app.connectors.greenhouse import GreenhouseConnector
 from backend.app.connectors.lever import LeverConnector
 from backend.app.connectors.remotive import RemotiveConnector
+from backend.app.connectors.jobspy import JobSpyConnector
 from backend.app.models.search_run import SearchRun, SourceExecutionLog
 from backend.app.schemas.job import NormalizedJob
 from backend.app.services.job_storage import JobStorageService
@@ -22,7 +23,7 @@ logger = logging.getLogger("orchestrator")
 
 
 class DiscoveryOrchestrator:
-    def __init__(self, per_source_timeout: int = 20, max_concurrency: int = 5):
+    def __init__(self, per_source_timeout: int = 25, max_concurrency: int = 5):
         self.per_source_timeout = per_source_timeout
         self.semaphore = asyncio.Semaphore(max_concurrency)
 
@@ -36,6 +37,8 @@ class DiscoveryOrchestrator:
             return LeverConnector(target_companies=target_companies, timeout_seconds=self.per_source_timeout)
         elif name == "remotive":
             return RemotiveConnector(timeout_seconds=self.per_source_timeout)
+        elif name == "jobspy":
+            return JobSpyConnector(timeout_seconds=self.per_source_timeout)
         else:
             raise ValueError(f"Unsupported job source connector: '{source_name}'")
 

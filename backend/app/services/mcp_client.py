@@ -24,6 +24,7 @@ class MCPToolRegistry:
         "get_company_postings",
         "check_source_status",
         "verify_job_url",
+        "search_jobspy_sources",
     }
 
     def __init__(self, default_timeout_seconds: int = 20):

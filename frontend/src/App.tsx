@@ -6,7 +6,7 @@ import { ChatSidebar } from './components/chat/ChatSidebar';
 import { ChatStream } from './components/chat/ChatStream';
 import { ChatInput } from './components/chat/ChatInput';
 import { JobDetailModal } from './components/JobDetailModal';
-import Demo from './components/ui/demo';
+import { OpportuneHero } from './components/ui/OpportuneHero';
 
 export const App: React.FC = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -15,7 +15,7 @@ export const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedJob, setSelectedJob] = useState<ScoredJob | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'prompt-bond' | 'chat'>('prompt-bond');
+  const [viewMode, setViewMode] = useState<'discover' | 'chat'>('discover');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -270,7 +270,7 @@ export const App: React.FC = () => {
             >
               <button
                 type="button"
-                onClick={() => setViewMode('prompt-bond')}
+                onClick={() => setViewMode('discover')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -281,13 +281,13 @@ export const App: React.FC = () => {
                   fontWeight: 600,
                   border: 'none',
                   cursor: 'pointer',
-                  background: viewMode === 'prompt-bond' ? 'var(--primary, #6366f1)' : 'transparent',
-                  color: viewMode === 'prompt-bond' ? '#ffffff' : 'var(--text-muted, #94a3b8)',
+                  background: viewMode === 'discover' ? 'var(--primary, #6366f1)' : 'transparent',
+                  color: viewMode === 'discover' ? '#ffffff' : 'var(--text-muted, #94a3b8)',
                   transition: 'all 0.15s ease',
                 }}
               >
                 <Compass size={13} />
-                <span>Prompt Bond UI</span>
+                <span>Discovery Hub</span>
               </button>
 
               <button
@@ -333,10 +333,17 @@ export const App: React.FC = () => {
           </div>
         </header>
 
-        {/* View Mode Rendering: PromptBond Interactive Hero vs Standard Chat */}
-        {viewMode === 'prompt-bond' ? (
+        {/* View Mode Rendering: OpportuneHero vs Standard Chat */}
+        {viewMode === 'discover' ? (
           <div style={{ flex: 1, width: '100%', height: 'calc(100vh - 54px)', overflow: 'hidden', position: 'relative' }}>
-            <Demo />
+            <OpportuneHero
+              onStartSearch={(prompt) => {
+                setViewMode('chat');
+                if (prompt) {
+                  handleSendMessage(prompt);
+                }
+              }}
+            />
           </div>
         ) : (
           <>

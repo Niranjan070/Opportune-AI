@@ -15,6 +15,7 @@ async def test_mcp_tool_discovery():
     assert "get_company_postings" in tool_names
     assert "check_source_status" in tool_names
     assert "verify_job_url" in tool_names
+    assert "search_jobspy_sources" in tool_names
 
 
 @pytest.mark.asyncio

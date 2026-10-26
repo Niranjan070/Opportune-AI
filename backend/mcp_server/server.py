@@ -179,6 +179,36 @@ async def verify_job_url(url: str) -> Dict[str, Any]:
         }
 
 
+@mcp_server.tool(
+    name="search_jobspy_sources",
+    description="Discover listings across major aggregate boards (LinkedIn, Indeed, Glassdoor, ZipRecruiter) powered by JobSpy."
+)
+async def search_jobspy_sources(
+    keywords: Optional[str] = None,
+    location: Optional[str] = None,
+    workplace_type: Optional[str] = None,
+    limit: int = 15,
+    sites: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Search major external job boards via JobSpy concurrently.
+    """
+    try:
+        from backend.app.connectors.jobspy import JobSpyConnector
+        connector = JobSpyConnector(timeout_seconds=25)
+        jobs = await connector.search(
+            keywords=keywords,
+            location=location,
+            workplace_type=workplace_type,
+            limit=limit,
+            sites=sites
+        )
+        return [j.model_dump(mode="json") for j in jobs]
+    except Exception as e:
+        logger.error(f"search_jobspy_sources failed: {e}", exc_info=True)
+        return []
+
+
 def main():
     """Run the MCP server over stdio transport"""
     asyncio.run(mcp_server.run_stdio_async())
