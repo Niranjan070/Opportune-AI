@@ -82,6 +82,20 @@ class MCPToolRegistry:
         start_time = time.perf_counter()
         timestamp = datetime.now(timezone.utc).isoformat()
 
+        # Check Cache before performing network scraping or API queries
+        from backend.app.services.search_cache import search_cache
+        cached_data = search_cache.get(tool_name, arguments)
+        if cached_data is not None:
+            return {
+                "tool_name": tool_name,
+                "status": "success",
+                "latency_ms": 1,
+                "data": cached_data,
+                "error": None,
+                "timestamp": timestamp,
+                "cached": True,
+            }
+
         async with self._semaphore:
             try:
                 # Execute tool with bounded timeout
@@ -99,6 +113,9 @@ class MCPToolRegistry:
                         output = result.structured_content
                 elif result.content:
                     output = [c.text for c in result.content if hasattr(c, "text")]
+
+                if output and not result.is_error:
+                    search_cache.set(tool_name, arguments, output)
 
                 return {
                     "tool_name": tool_name,
