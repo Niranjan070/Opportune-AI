@@ -80,106 +80,83 @@ class QueryPlanner:
                     )
                 )
 
-        # Strategy 2: Geographic Search via JobSpy (Naukri, LinkedIn, Indeed, Glassdoor)
-        if loc_profile.is_india:
-            # India-specific multi-board query
-            target_city = loc_profile.city or (locations[0] if locations else None)
-            search_loc = f"{target_city}, India" if target_city else "India"
-
-            # Primary: Exact local city / region on Indian platforms
-            plan.append(
-                SearchPlanItem(
-                    tool_name="search_jobspy_sources",
-                    arguments={
-                        "keywords": primary_keywords,
-                        "location": search_loc,
-                        "workplace_type": workplace if workplace != "any" else None,
-                        "limit": 30,
-                    },
-                    priority=1,
-                    description=f"Scrape LinkedIn, Naukri, & Indeed for '{primary_keywords}' in {search_loc}",
-                )
-            )
-
-            # Secondary: If user asked for a specific Tier-2/3 city (like Coimbatore),
-            # also search for pan-India remote opportunities for the same role
-            if loc_profile.search_scope == "city" or loc_profile.is_remote:
-                plan.append(
-                    SearchPlanItem(
-                        tool_name="search_jobspy_sources",
-                        arguments={
-                            "keywords": f"{primary_keywords} Remote",
-                            "location": "India",
-                            "workplace_type": "remote",
-                            "limit": 20,
-                        },
-                        priority=2,
-                        description=f"Search pan-India remote listings for '{primary_keywords}'",
-                    )
-                )
-
-            # Tertiary: Public boards for global remote jobs if user didn't forbid remote
-            if workplace != "on_site":
-                plan.append(
-                    SearchPlanItem(
-                        tool_name="search_job_sources",
-                        arguments={
-                            "keywords": primary_keywords,
-                            "location": None,
-                            "workplace_type": "remote",
-                            "limit": 20,
-                        },
-                        priority=2,
-                        description=f"Query global remote boards (Remotive/Arbeitnow) for '{primary_keywords}'",
-                    )
-                )
-
+        # Strategy 2: Dynamic Multi-Board Search via MCP Tools
+        # Determine exact search location from user input or extracted criteria
+        if locations:
+            search_loc = locations[0]
+            if loc_profile.is_india and loc_profile.city and "india" not in search_loc.lower():
+                search_loc = f"{search_loc}, India"
+        elif loc_profile.city:
+            search_loc = f"{loc_profile.city}, India" if loc_profile.is_india else loc_profile.city
+        elif loc_profile.state:
+            search_loc = f"{loc_profile.state}, India" if loc_profile.is_india else loc_profile.state
+        elif loc_profile.country:
+            search_loc = loc_profile.country
         else:
-            # Global or Non-India regional search
-            search_loc = locations[0] if locations else None
+            search_loc = None if loc_profile.is_remote else None
 
+        # 1. Query aggregate job boards (LinkedIn, Glassdoor, Indeed, Naukri) via JobSpy
+        plan.append(
+            SearchPlanItem(
+                tool_name="search_jobspy_sources",
+                arguments={
+                    "keywords": primary_keywords,
+                    "location": search_loc,
+                    "workplace_type": workplace if workplace != "any" else None,
+                    "limit": 30,
+                },
+                priority=1,
+                description=f"Query major boards for '{primary_keywords}' in {search_loc or 'All Locations'}",
+            )
+        )
+
+        # 2. Query public tech and aggregator boards (Arbeitnow & Remotive)
+        plan.append(
+            SearchPlanItem(
+                tool_name="search_job_sources",
+                arguments={
+                    "keywords": primary_keywords,
+                    "location": search_loc,
+                    "workplace_type": workplace if workplace != "any" else None,
+                    "limit": 25,
+                },
+                priority=1,
+                description=f"Query public boards for '{primary_keywords}' in {search_loc or 'Remote/Global'}",
+            )
+        )
+
+        # 3. If user asked for a specific local city and remote is not forbidden,
+        # also search for country/regional remote listings
+        if loc_profile.search_scope == "city" and workplace != "on_site":
+            fallback_region = "India" if loc_profile.is_india else (loc_profile.country or "Remote")
             plan.append(
                 SearchPlanItem(
                     tool_name="search_jobspy_sources",
                     arguments={
-                        "keywords": primary_keywords,
-                        "location": search_loc,
-                        "workplace_type": workplace if workplace != "any" else None,
-                        "limit": 25,
+                        "keywords": f"{primary_keywords} Remote",
+                        "location": fallback_region,
+                        "workplace_type": "remote",
+                        "limit": 20,
                     },
-                    priority=1,
-                    description=f"Search general boards for '{primary_keywords}' in {search_loc or 'Global'}",
+                    priority=2,
+                    description=f"Search regional remote listings for '{primary_keywords}'",
                 )
             )
 
-            plan.append(
-                SearchPlanItem(
-                    tool_name="search_job_sources",
-                    arguments={
-                        "keywords": primary_keywords,
-                        "location": search_loc,
-                        "workplace_type": workplace if workplace != "any" else None,
-                        "limit": 25,
-                    },
-                    priority=1,
-                    description=f"Search Arbeitnow and Remotive for '{primary_keywords}'",
-                )
-            )
-
-            # Fallback to curated tech company ATS boards if no companies were given
-            if not companies and not search_loc:
-                for default_comp in ["gitlab", "figma"]:
-                    plan.append(
-                        SearchPlanItem(
-                            tool_name="get_company_postings",
-                            arguments={
-                                "company_token": default_comp,
-                                "keywords": primary_keywords,
-                                "limit": 15,
-                            },
-                            priority=3,
-                            description=f"Check {default_comp.title()} tech board",
-                        )
+        # 4. Fallback to curated tech company ATS boards if no companies were given and no location specified
+        if not companies and not search_loc:
+            for default_comp in ["gitlab", "figma"]:
+                plan.append(
+                    SearchPlanItem(
+                        tool_name="get_company_postings",
+                        arguments={
+                            "company_token": default_comp,
+                            "keywords": primary_keywords,
+                            "limit": 15,
+                        },
+                        priority=3,
+                        description=f"Check {default_comp.title()} tech board",
                     )
+                )
 
         return plan

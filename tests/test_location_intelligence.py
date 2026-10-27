@@ -60,3 +60,34 @@ def test_geographic_relevance_remote_allowed():
     assert is_match is True
     assert multiplier >= 0.7
     assert "remote" in reason
+
+
+def test_resolve_europe_query():
+    profile = resolve_location("find me job opportunities for ai engineer in europe")
+    assert profile.is_europe is True
+    assert profile.search_scope == "europe"
+    assert profile.country == "Europe"
+
+
+def test_geographic_relevance_europe_match():
+    profile = resolve_location("europe")
+    is_match, multiplier, reason = compute_geographic_relevance("Berlin, Germany", profile)
+    assert is_match is True
+    assert multiplier >= 1.10
+    assert "europe-match" in reason
+
+
+def test_geographic_relevance_europe_remote():
+    profile = resolve_location("europe")
+    is_match, multiplier, reason = compute_geographic_relevance("Remote (Europe, UK, Germany)", profile)
+    assert is_match is True
+    assert multiplier >= 1.15
+    assert "remote-europe" in reason
+
+
+def test_geographic_relevance_europe_reject_foreign():
+    profile = resolve_location("europe")
+    is_match, multiplier, reason = compute_geographic_relevance("Chennai, India", profile)
+    assert is_match is False
+    assert multiplier < 0.2
+    assert "foreign-onsite-mismatch" in reason

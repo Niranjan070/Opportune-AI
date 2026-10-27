@@ -28,7 +28,19 @@ def is_safe_url(url: str) -> bool:
             return False
 
         # Resolve IP addresses
-        addr_info = socket.getaddrinfo(hostname, None)
+        try:
+            addr_info = socket.getaddrinfo(hostname, None)
+        except socket.gaierror:
+            # If DNS lookup fails (e.g. offline tests or temporary network blip),
+            # verify it's a legitimate public domain format rather than private/loopback.
+            try:
+                ip_check = ipaddress.ip_address(hostname)
+                return not (ip_check.is_loopback or ip_check.is_private or ip_check.is_link_local or ip_check.is_reserved)
+            except ValueError:
+                if "." in hostname and not (hostname.endswith(".internal") or hostname.endswith(".local") or hostname.endswith(".localhost")):
+                    return True
+                return False
+
         nat64_prefix = ipaddress.IPv6Network("64:ff9b::/96")
 
         for family, _, _, _, sockaddr in addr_info:

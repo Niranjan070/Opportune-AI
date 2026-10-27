@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PanelLeftOpen, Sparkles, MessageSquare, Compass, Bookmark } from 'lucide-react';
+import { PanelLeftOpen, Sparkles, Bookmark } from 'lucide-react';
 import { api } from './services/api';
 import type { ChatSession, ScoredJob } from './types';
 import { ChatSidebar } from './components/chat/ChatSidebar';
@@ -7,7 +7,6 @@ import { ChatStream } from './components/chat/ChatStream';
 import { ChatInput } from './components/chat/ChatInput';
 import { JobDetailModal } from './components/JobDetailModal';
 import { SavedJobsModal } from './components/SavedJobsModal';
-import { OpportuneHero } from './components/ui/OpportuneHero';
 
 export const App: React.FC = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -16,7 +15,6 @@ export const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedJob, setSelectedJob] = useState<ScoredJob | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'discover' | 'chat'>('discover');
   const [isSavedJobsOpen, setIsSavedJobsOpen] = useState<boolean>(false);
   const [savedCount, setSavedCount] = useState<number>(0);
 
@@ -69,7 +67,6 @@ export const App: React.FC = () => {
     try {
       const detail = await api.getChatSessionDetail(sessionId);
       setActiveSession(detail);
-      setViewMode('chat');
     } catch (err: any) {
       showToast(`Error switching chat: ${err.message}`);
     }
@@ -81,7 +78,6 @@ export const App: React.FC = () => {
       const created = await api.createChatSession({ title: 'New Job Search' });
       setSessions((prev) => [created, ...prev]);
       setActiveSession(created);
-      setViewMode('chat');
     } catch (err: any) {
       showToast(`Failed to create chat: ${err.message}`);
     }
@@ -270,63 +266,6 @@ export const App: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* View Mode Segmented Controls */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: 'rgba(255, 255, 255, 0.05)',
-                padding: '3px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                gap: '2px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setViewMode('discover')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: viewMode === 'discover' ? 'var(--primary, #6366f1)' : 'transparent',
-                  color: viewMode === 'discover' ? '#ffffff' : 'var(--text-muted, #94a3b8)',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <Compass size={13} />
-                <span>Discovery Hub</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode('chat')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: viewMode === 'chat' ? 'var(--primary, #6366f1)' : 'transparent',
-                  color: viewMode === 'chat' ? '#ffffff' : 'var(--text-muted, #94a3b8)',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <MessageSquare size={13} />
-                <span>Chat Assistant</span>
-              </button>
-            </div>
-
             {/* Saved Jobs Trigger Button */}
             <button
               type="button"
@@ -338,10 +277,10 @@ export const App: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '4px 11px',
+                padding: '6px 13px',
                 borderRadius: '8px',
-                background: 'rgba(99, 102, 241, 0.15)',
-                border: '1px solid rgba(99, 102, 241, 0.35)',
+                background: 'rgba(99, 102, 241, 0.12)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
                 color: '#a5b4fc',
                 fontSize: '12px',
                 fontWeight: 600,
@@ -373,7 +312,7 @@ export const App: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '4px 10px',
+                padding: '6px 12px',
                 borderRadius: '999px',
                 background: 'rgba(99, 102, 241, 0.12)',
                 border: '1px solid rgba(99, 102, 241, 0.25)',
@@ -383,41 +322,27 @@ export const App: React.FC = () => {
               }}
             >
               <Sparkles size={12} color="var(--primary)" />
-              <span>Gemini 2.5 Flash</span>
+              <span>Gemini 2.5 Flash • MCP</span>
             </div>
           </div>
         </header>
 
-        {/* View Mode Rendering: OpportuneHero vs Standard Chat */}
-        {viewMode === 'discover' ? (
-          <div style={{ flex: 1, width: '100%', height: 'calc(100vh - 54px)', overflow: 'hidden', position: 'relative' }}>
-            <OpportuneHero
-              onStartSearch={(prompt) => {
-                setViewMode('chat');
-                if (prompt) {
-                  handleSendMessage(prompt);
-                }
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            {/* Message Stream */}
-            <ChatStream
-              session={activeSession}
-              isLoading={isLoading}
-              onInspectJob={(job) => setSelectedJob(job)}
-              onSubscribe={handleSubscribe}
-              onUnsubscribe={handleUnsubscribe}
-              onSelectPrompt={handleSendMessage}
-            />
+        {/* Cohesive Chat Experience with MorphOrb */}
+        <ChatStream
+          session={activeSession}
+          isLoading={isLoading}
+          onInspectJob={(job) => setSelectedJob(job)}
+          onSubscribe={handleSubscribe}
+          onUnsubscribe={handleUnsubscribe}
+          onSelectPrompt={handleSendMessage}
+        />
 
-            {/* Bottom Centered Input */}
-            <ChatInput
-              onSendMessage={handleSendMessage}
-              isLoading={isLoading}
-            />
-          </>
+        {/* Bottom Centered Input — ONLY displayed when conversation has active messages */}
+        {(activeSession?.messages?.length || 0) > 0 && (
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+          />
         )}
       </div>
 

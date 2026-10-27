@@ -99,3 +99,61 @@ def test_scorer_hard_exclusion_keyword():
     assert breakdown.total_score == 0.0
     assert breakdown.tier == ScoreTier.LOW
     assert "Excluded keyword: 'crypto'" in breakdown.explanation
+
+
+def test_scorer_strict_role_mismatch():
+    profile = SearchProfileBase(
+        name="AI Engineer Profile",
+        target_titles=["AI Engineer"],
+        skills=[],
+        workplace_preference="remote",
+        excluded_employers=[],
+        excluded_keywords=[],
+    )
+
+    job = NormalizedJob(
+        source="remotive",
+        source_job_id="404",
+        title="Remote Office Assistant",
+        company="Coalition Technologies",
+        location="Remote (Worldwide)",
+        workplace_type=WorkplaceType.REMOTE,
+        description="Office Assistant helping with scheduling, email sorting, and using AI tools like ChatGPT.",
+        job_url="https://example.com/job/404",
+    )
+
+    breakdown, is_excluded = DeterministicScoringService.evaluate_job(job, profile)
+
+    assert is_excluded is False
+    assert breakdown.total_score <= 35.0
+    assert breakdown.tier == ScoreTier.LOW
+    assert "Low role title alignment" in breakdown.explanation
+
+
+def test_scorer_tech_stack_detected_explanation():
+    profile = SearchProfileBase(
+        name="AI Engineer Profile",
+        target_titles=["AI Engineer"],
+        skills=[],
+        workplace_preference="remote",
+        excluded_employers=[],
+        excluded_keywords=[],
+    )
+
+    job = NormalizedJob(
+        source="remotive",
+        source_job_id="505",
+        title="Senior AI Engineer",
+        company="TechCorp",
+        location="Remote",
+        workplace_type=WorkplaceType.REMOTE,
+        description="Build LLM applications with Python, PyTorch, and FastAPI.",
+        job_url="https://example.com/job/505",
+    )
+
+    breakdown, is_excluded = DeterministicScoringService.evaluate_job(job, profile)
+
+    assert is_excluded is False
+    assert breakdown.total_score >= 70.0
+    assert "Tech stack detected:" in breakdown.explanation
+    assert "Matched 15/15" not in breakdown.explanation

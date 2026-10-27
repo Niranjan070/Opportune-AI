@@ -77,11 +77,28 @@ class RemotiveConnector(BaseJobConnector):
                     job_url = item.get("url", "")
                     description = item.get("description", "")
 
-                    # Filter candidate location
-                    if loc_lower and loc_lower != "remote":
+                    # Validate domain keywords in title or tags
+                    if keywords:
+                        import re
+                        kw_clean = keywords.lower().strip()
+                        terms = [t for t in kw_clean.split() if t]
+                        generic_terms = {"engineer", "developer", "specialist", "intern", "internship", "lead", "senior", "junior", "associate", "manager", "roles", "jobs"}
+                        domain_terms = [t for t in terms if t not in generic_terms]
+
+                        raw_tags = [str(t).lower() for t in item.get("tags", [])]
+                        title_and_tags = f"{title.lower()} {' '.join(raw_tags)}"
+
+                        if domain_terms:
+                            has_domain = any(re.search(rf"\b{re.escape(dt)}\b", title_and_tags) for dt in domain_terms)
+                            if not has_domain:
+                                continue
+
+                    # Filter candidate location dynamically
+                    if loc_lower and loc_lower not in ("remote", "any", "all"):
                         cand_loc_low = candidate_location.lower()
-                        is_global = any(w in cand_loc_low for w in ("worldwide", "anywhere", "global", "all", "apac"))
-                        if not is_global and loc_lower not in cand_loc_low:
+                        is_global = any(w in cand_loc_low for w in ("worldwide", "anywhere", "global", "all"))
+                        from backend.app.services.location_intelligence import check_location_match
+                        if not is_global and not check_location_match(cand_loc_low, loc_lower):
                             continue
 
                     # Employment type

@@ -103,19 +103,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
         ))}
       </div>
 
-      {/* Input Box */}
+      {/* Input Box Pill */}
       <div
         style={{
+          position: 'relative',
           display: 'flex',
-          alignItems: 'flex-end',
-          gap: '10px',
-          background: 'rgba(17, 24, 39, 0.9)',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '8px 12px',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
+          alignItems: 'center',
+          gap: '12px',
+          background: 'rgba(17, 24, 39, 0.92)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(129, 140, 248, 0.3)',
+          borderRadius: '9999px',
+          padding: '6px 10px 6px 18px',
+          boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+          transition: 'all 0.2s ease',
         }}
       >
+        <Sparkles size={18} color="#818cf8" style={{ flexShrink: 0, opacity: 0.8 }} />
+
         <textarea
           ref={textareaRef}
           value={input}
@@ -126,16 +132,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
           disabled={isLoading}
           style={{
             flex: 1,
-            background: 'none',
+            background: 'transparent',
             border: 'none',
             outline: 'none',
-            color: 'var(--text-main)',
-            fontSize: '13px',
+            color: '#f9fafb',
+            fontSize: '14px',
             fontFamily: 'inherit',
             resize: 'none',
             lineHeight: 1.5,
-            maxHeight: '140px',
-            padding: '4px',
+            maxHeight: '120px',
+            padding: '6px 0',
           }}
         />
 
@@ -143,36 +149,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
           type="button"
           onClick={handleSend}
           disabled={!input.trim() || isLoading}
-          className="btn btn-primary"
           style={{
-            padding: '8px 14px',
-            borderRadius: 'var(--radius-md)',
+            width: '38px',
+            height: '38px',
+            borderRadius: '9999px',
+            background: input.trim() && !isLoading ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid',
+            borderColor: input.trim() && !isLoading ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.12)',
+            color: input.trim() && !isLoading ? '#ffffff' : 'rgba(255, 255, 255, 0.4)',
+            boxShadow: input.trim() && !isLoading ? '0 0 16px rgba(99, 102, 241, 0.6)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
-            fontSize: '13px',
-            fontWeight: 600,
-            opacity: !input.trim() || isLoading ? 0.5 : 1,
+            cursor: input.trim() && !isLoading ? 'pointer' : 'default',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            flexShrink: 0,
           }}
         >
           {isLoading ? (
-            <>
-              <Loader2 size={15} className="spin" />
-              <span>Searching...</span>
-            </>
+            <Loader2 size={16} className="spin" color="#818cf8" />
           ) : (
-            <>
-              <span>Send</span>
-              <Send size={14} />
-            </>
+            <Send size={15} style={{ marginLeft: '1px' }} />
           )}
         </button>
       </div>
-        <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px', textAlign: 'center' }}>
-          Press <kbd style={{ padding: '1px 4px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px' }}>Enter</kbd> to search &bull; <kbd style={{ padding: '1px 4px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px' }}>Shift + Enter</kbd> for newline
-        </div>
+
+      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '10px', textAlign: 'center' }}>
+        Press <kbd style={{ padding: '2px 5px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', color: '#9ca3af' }}>Enter</kbd> to search &bull; <kbd style={{ padding: '2px 5px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', color: '#9ca3af' }}>Shift + Enter</kbd> for newline
       </div>
     </div>
+  </div>
   );
 };

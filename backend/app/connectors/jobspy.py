@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime, timezone
 import logging
 from typing import Any, Dict, List, Optional
+import pandas as pd
 
 from backend.app.connectors.base import BaseJobConnector
 from backend.app.schemas.job import NormalizedJob, WorkplaceType, EmploymentType
@@ -51,24 +52,45 @@ class JobSpyConnector(BaseJobConnector):
         if not keywords and not location:
             return []
 
+        loc_str = (location or "").strip()
+        loc_lower = loc_str.lower()
+
         # Use Location Intelligence to resolve location semantics
         from backend.app.services.location_intelligence import resolve_location
-        loc_profile = resolve_location(f"{location or ''} {keywords or ''}")
+        loc_profile = resolve_location(f"{loc_str} {keywords or ''}")
         is_india = loc_profile.is_india
 
         if is_india:
             country_indeed = "india"
             target_sites = sites or ["naukri", "linkedin", "indeed", "glassdoor"]
-            if loc_profile.city:
-                job_search_location = f"{loc_profile.city}, India"
-            elif location:
-                job_search_location = f"{location}, India" if "india" not in location.lower() else location
-            else:
-                job_search_location = "India"
-        else:
+            job_search_location = f"{loc_profile.city}, India" if loc_profile.city else (loc_str if "india" in loc_lower else f"{loc_str}, India")
+        elif any(u in loc_lower for u in ("usa", "united states", "us", "san francisco", "new york", "seattle", "austin", "chicago", "boston")):
             country_indeed = "usa"
             target_sites = sites or ["indeed", "zip_recruiter", "linkedin", "glassdoor"]
-            job_search_location = location or ""
+            job_search_location = loc_str
+        elif any(c in loc_lower for c in ("uk", "united kingdom", "london")):
+            country_indeed = "uk"
+            target_sites = sites or ["indeed", "linkedin", "glassdoor"]
+            job_search_location = loc_str
+        elif any(c in loc_lower for c in ("germany", "berlin", "munich", "frankfurt")):
+            country_indeed = "germany"
+            target_sites = sites or ["indeed", "linkedin", "glassdoor"]
+            job_search_location = loc_str
+        elif any(c in loc_lower for c in ("france", "paris")):
+            country_indeed = "france"
+            target_sites = sites or ["indeed", "linkedin", "glassdoor"]
+            job_search_location = loc_str
+        elif any(c in loc_lower for c in ("canada", "toronto", "vancouver")):
+            country_indeed = "canada"
+            target_sites = sites or ["indeed", "zip_recruiter", "linkedin", "glassdoor"]
+            job_search_location = loc_str
+        else:
+            # Dynamic international handling:
+            # For general regions, continents, or international locations (e.g. "Europe", "Asia", "Dubai", "Singapore", etc.)
+            # LinkedIn and Glassdoor natively accept ANY location string without failing
+            country_indeed = "usa"
+            target_sites = sites or ["linkedin", "glassdoor"]
+            job_search_location = loc_str
 
         is_remote = workplace_type and workplace_type.lower() in ("remote", "anywhere")
 

@@ -74,14 +74,26 @@ class ArbeitnowConnector(BaseJobConnector):
 
                     # Filter keywords if specified
                     if kw_lower:
+                        import re
                         tags_str = " ".join(tags).lower()
                         searchable = f"{title.lower()} {company.lower()} {tags_str}"
-                        if not any(term in searchable for term in kw_lower.split()):
-                            continue
+                        terms = [t.strip() for t in kw_lower.split() if t.strip()]
+                        generic_terms = {"engineer", "developer", "specialist", "intern", "internship", "lead", "senior", "junior", "associate", "manager", "roles", "jobs"}
+                        domain_terms = [t for t in terms if t not in generic_terms]
 
-                    # Filter location if specified
-                    if loc_lower and loc_lower not in job_location.lower() and not (loc_lower == "remote" and is_remote):
-                        continue
+                        if domain_terms:
+                            has_domain = any(re.search(rf"\b{re.escape(dt)}\b", searchable) for dt in domain_terms)
+                            if not has_domain:
+                                continue
+                        else:
+                            if not any(term in searchable for term in terms):
+                                continue
+
+                    # Filter location dynamically
+                    if loc_lower and loc_lower not in ("remote", "any", "all"):
+                        from backend.app.services.location_intelligence import check_location_match
+                        if not check_location_match(job_location.lower(), loc_lower) and not (is_remote and "remote" in loc_lower):
+                            continue
 
                     # Workplace Type
                     if is_remote:

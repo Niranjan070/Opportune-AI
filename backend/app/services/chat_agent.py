@@ -26,7 +26,7 @@ from backend.app.services.location_intelligence import (
     resolve_location,
     compute_geographic_relevance,
 )
-from backend.app.services.query_planner import QueryPlanner
+from backend.app.services.query_planner import QueryPlanner, SearchPlanItem
 from backend.app.services.result_merger import merge_and_filter_results, format_source_display
 from backend.app.services.salary_intelligence import SalaryIntelligenceService
 from backend.app.services.company_intelligence import CompanyIntelligenceService
@@ -123,6 +123,152 @@ class ChatAgentService:
 
         return None
 
+    async def _plan_with_gemini_tools(
+        self,
+        user_message: str,
+        criteria: Dict[str, Any],
+    ) -> Optional[List[SearchPlanItem]]:
+        """
+        Uses Gemini Native Function Calling to autonomously select MCP tools and arguments.
+        Falls back to None if Gemini API key is missing or encounters rate-limits (429).
+        """
+        if not settings.GEMINI_API_KEY:
+            return None
+
+        tools_declaration = [
+            {
+                "function_declarations": [
+                    {
+                        "name": "search_jobspy_sources",
+                        "description": "Searches aggregate job boards (LinkedIn, Indeed, Glassdoor, Naukri) for jobs with specific keywords and locations.",
+                        "parameters": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "keywords": {
+                                    "type": "STRING",
+                                    "description": "Job title or key tech stack (e.g. 'Frontend Developer', 'AI Engineer')",
+                                },
+                                "location": {
+                                    "type": "STRING",
+                                    "description": "Target city, country, or 'Remote' (e.g. 'Chennai', 'New Zealand', 'Berlin')",
+                                },
+                                "workplace_type": {
+                                    "type": "STRING",
+                                    "enum": ["remote", "hybrid", "on_site", "any"],
+                                    "description": "Workplace preference",
+                                },
+                                "limit": {
+                                    "type": "INTEGER",
+                                    "description": "Maximum listings to return",
+                                },
+                            },
+                            "required": ["keywords"],
+                        },
+                    },
+                    {
+                        "name": "search_job_sources",
+                        "description": "Searches remote and international tech feeds (Remotive, Arbeitnow).",
+                        "parameters": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "keywords": {
+                                    "type": "STRING",
+                                    "description": "Job title or technical keyword",
+                                },
+                                "location": {
+                                    "type": "STRING",
+                                    "description": "Location or null for global remote",
+                                },
+                                "workplace_type": {
+                                    "type": "STRING",
+                                    "enum": ["remote", "hybrid", "on_site", "any"],
+                                },
+                                "limit": {
+                                    "type": "INTEGER",
+                                    "description": "Max listings",
+                                },
+                            },
+                            "required": ["keywords"],
+                        },
+                    },
+                    {
+                        "name": "get_company_postings",
+                        "description": "Searches direct company ATS boards (Greenhouse/Lever) for a specific employer.",
+                        "parameters": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "company_token": {
+                                    "type": "STRING",
+                                    "description": "Company slug, e.g. 'gitlab', 'figma', 'stripe'",
+                                },
+                                "keywords": {
+                                    "type": "STRING",
+                                    "description": "Role keywords",
+                                },
+                            },
+                            "required": ["company_token"],
+                        },
+                    },
+                ]
+            }
+        ]
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.LLM_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": (
+                                "You are Opportune AI's autonomous Job Discovery Agent. "
+                                "Based on the candidate's query and extracted criteria, decide which MCP tools to invoke to find relevant job openings.\n"
+                                f"Candidate Query: {repr(user_message)}\n"
+                                f"Extracted Criteria: {criteria}\n"
+                                "Call the appropriate search tools now."
+                            )
+                        }
+                    ]
+                }
+            ],
+            "tools": tools_declaration,
+            "tool_config": {
+                "function_calling_config": {
+                    "mode": "AUTO"
+                }
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(url, json=payload)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates") or []
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        plan_items: List[SearchPlanItem] = []
+                        for part in parts:
+                            if "functionCall" in part:
+                                fc = part["functionCall"]
+                                tool_name = fc.get("name")
+                                args = fc.get("args") or {}
+                                if tool_name in self.mcp_registry.APPROVED_TOOLS:
+                                    plan_items.append(
+                                        SearchPlanItem(
+                                            tool_name=tool_name,
+                                            arguments=args,
+                                            priority=1,
+                                            description=f"Autonomous tool call: {tool_name} with {args}",
+                                        )
+                                    )
+                        if plan_items:
+                            logger.info(f"Gemini autonomous function calling planned {len(plan_items)} tools: {[p.tool_name for p in plan_items]}")
+                            return plan_items
+        except Exception as e:
+            logger.warning(f"Gemini tool planning request failed: {e}. Falling back to rule-based planner.")
+
+        return None
+
     async def _generate_conversational_response_with_gemini(
         self,
         user_message: str,
@@ -186,11 +332,19 @@ class ChatAgentService:
             if re.search(pattern, text_lower):
                 skills.append(skill.title() if len(skill) > 3 else skill.upper())
 
-        # 3. Detect roles
+        # 3. Detect roles dynamically
         roles = []
-        for role in ROLE_KEYWORDS:
-            if re.search(r"\b" + re.escape(role) + r"\b", text_lower):
-                roles.append(role.title())
+        compound_role_match = re.search(
+            r"\b((?:frontend|front-end|backend|back-end|fullstack|full-stack|ai|ml|machine learning|data|devops|cloud|mobile|ios|android|qa|security|software|react|python)\s+(?:developer|engineer|specialist|architect|scientist|lead|manager|intern(?:ship)?))\b",
+            text_lower
+        )
+        if compound_role_match:
+            roles.append(compound_role_match.group(1).title())
+        else:
+            for role in ROLE_KEYWORDS:
+                if re.search(r"\b" + re.escape(role) + r"\b", text_lower):
+                    roles.append(role.title())
+                    break
 
         if not roles:
             # Fallback to general software engineer if skills detected
@@ -217,20 +371,25 @@ class ChatAgentService:
         elif re.search(r"\b(on-site|onsite|in-office|office)\b", text_lower):
             workplace = "on_site"
 
-        # 6. Locations with Location Intelligence
+        # 6. Locations with Dynamic Query Extraction & Location Intelligence
         locations = []
+        in_match = re.search(
+            r"\b(?:in|at|around|near)\s+([a-zA-Z\s\-]+?)(?:\s+(?:role|roles|job|jobs|position|positions|with|for|intern|internship|matching)|$)",
+            text_lower
+        )
+        if in_match:
+            candidate_loc = in_match.group(1).strip()
+            candidate_loc = re.sub(r"\b(role|roles|job|jobs|position|positions|openings?)\b", "", candidate_loc).strip()
+            if candidate_loc and len(candidate_loc) > 1 and candidate_loc not in ("office", "the", "a", "an", "any"):
+                locations.append(candidate_loc.title())
+
         loc_prof = resolve_location(text_lower)
-        if loc_prof.city:
+        if loc_prof.city and loc_prof.city not in locations:
             locations.append(loc_prof.city)
         if loc_prof.state and loc_prof.state not in locations:
             locations.append(loc_prof.state)
-        if loc_prof.country and loc_prof.country not in locations:
+        if loc_prof.country and loc_prof.country not in locations and loc_prof.country != "Remote":
             locations.append(loc_prof.country)
-        if not locations:
-            # Fallback scan for common international regions
-            for loc in ["germany", "berlin", "europe", "usa", "us", "united states", "london", "uk", "remote", "worldwide"]:
-                if re.search(r"\b" + re.escape(loc) + r"\b", text_lower):
-                    locations.append(loc.title())
 
         # 7. Salary detection (e.g. $140k, 120k, $150,000)
         salary_match = re.search(r"\$?(\d{2,3})k\b", text_lower)
@@ -256,13 +415,17 @@ class ChatAgentService:
     ) -> Tuple[List[Dict[str, Any]], List[NormalizedJob]]:
         """
         Dynamically plans and executes approved MCP tools concurrently based on candidate intent.
+        Supports both Gemini Autonomous Tool Calling and Deterministic Query Planning.
+        Includes ReAct reflection & autonomous broadening if zero results occur.
         Applies cross-source deduplication and geographic relevance filtering.
         """
         tool_records: List[Dict[str, Any]] = []
         raw_jobs_collected: List[NormalizedJob] = []
 
-        # 1. Generate multi-tool search plan
-        plan = QueryPlanner.plan(criteria, raw_user_query=raw_user_query)
+        # 1. Generate multi-tool search plan (Gemini autonomous tool calling or QueryPlanner fallback)
+        plan = await self._plan_with_gemini_tools(raw_user_query, criteria)
+        if not plan:
+            plan = QueryPlanner.plan(criteria, raw_user_query=raw_user_query)
 
         # 2. Execute planned tools concurrently
         async def _run_tool(item):
@@ -327,6 +490,55 @@ class ChatAgentService:
             max_results=50,
         )
 
+        # 4. ReAct Reflection & Retry Loop: If 0 qualifying jobs found, reflect and broaden
+        if len(merged_jobs) == 0 and allow_remote:
+            logger.info("ReAct reflection: 0 qualifying jobs found on initial pass. Initiating autonomous broadening.")
+            roles = criteria.get("roles") or []
+            skills = criteria.get("skills") or []
+            base_role = roles[0] if roles else (" ".join(skills[:2]) if skills else "Software Engineer")
+
+            retry_items: List[SearchPlanItem] = [
+                SearchPlanItem(
+                    tool_name="search_jobspy_sources",
+                    arguments={
+                        "keywords": f"{base_role} Remote",
+                        "location": None,
+                        "workplace_type": "remote",
+                        "limit": 20,
+                    },
+                    priority=2,
+                    description=f"Autonomous retry: Broaden search to remote '{base_role}' positions",
+                ),
+                SearchPlanItem(
+                    tool_name="search_job_sources",
+                    arguments={
+                        "keywords": base_role,
+                        "location": None,
+                        "workplace_type": "remote",
+                        "limit": 20,
+                    },
+                    priority=2,
+                    description=f"Autonomous retry: Query remote tech boards for '{base_role}'",
+                ),
+            ]
+
+            retry_completed = await asyncio.gather(*[_run_tool(item) for item in retry_items], return_exceptions=True)
+            retry_jobs: List[NormalizedJob] = []
+            for outcome in retry_completed:
+                if isinstance(outcome, Exception):
+                    continue
+                record, jobs = outcome
+                tool_records.append(record)
+                retry_jobs.extend(jobs)
+
+            if retry_jobs:
+                merged_jobs = merge_and_filter_results(
+                    raw_jobs=raw_jobs_collected + retry_jobs,
+                    location_profile=loc_profile,
+                    allow_remote=True,
+                    max_results=50,
+                )
+
         return tool_records, merged_jobs
 
     async def process_user_message(
@@ -348,8 +560,19 @@ class ChatAgentService:
         if not criteria:
             criteria = self._extract_criteria_rule_based(user_message_text)
 
-        # Merge with existing session search criteria if present
-        merged_criteria = {**(session.search_criteria or {}), **criteria}
+        # Update session search criteria: explicit new search intent overrides prior session criteria
+        merged_criteria = dict(session.search_criteria or {})
+        for k, v in criteria.items():
+            if v:
+                merged_criteria[k] = v
+
+        # If user changed roles or locations, do NOT retain outdated skills/locations from previous turns
+        old_roles = (session.search_criteria or {}).get("roles", [])
+        if criteria.get("roles") and criteria.get("roles") != old_roles:
+            merged_criteria["skills"] = criteria.get("skills", [])
+        if criteria.get("locations") and criteria.get("locations") != (session.search_criteria or {}).get("locations", []):
+            merged_criteria["locations"] = criteria.get("locations", [])
+
         session.search_criteria = merged_criteria
 
         # Step 2: Execute approved MCP tools
@@ -423,14 +646,20 @@ class ChatAgentService:
                     "posted_at": job.posted_at.isoformat() if job.posted_at else None,
                 })
 
-        # Rank by match_score descending and take top 6
-        scored_candidates.sort(key=lambda x: x["match_score"], reverse=True)
-        top_scored_jobs = scored_candidates[:6]
+        # Filter: Only present jobs that actually qualify (match_score >= 40.0 and score_tier != "low")
+        # Do not present mismatched jobs (e.g. 22% office assistant when searching for frontend developer)
+        qualifying_candidates = [
+            j for j in scored_candidates
+            if j["match_score"] >= 40.0 and j.get("score_tier") != "low"
+        ]
+        qualifying_candidates.sort(key=lambda x: x["match_score"], reverse=True)
+        top_scored_jobs = qualifying_candidates[:6]
 
         # Step 5: Compose conversational markdown response
         roles_str = ", ".join(merged_criteria.get("roles", [])) or "roles"
         skills_str = ", ".join(merged_criteria.get("skills", [])) or "your skills"
         companies_str = ", ".join([c.title() for c in merged_criteria.get("companies", [])])
+        locations_str = ", ".join(merged_criteria.get("locations", []))
         total_found = len(raw_jobs)
         top_matches_count = len(top_scored_jobs)
 
@@ -457,9 +686,11 @@ class ChatAgentService:
                     f"Here are the **top {top_matches_count} matching opportunities**:"
                 )
             else:
+                loc_label = f" in **{locations_str}**" if locations_str else ""
                 content_parts.append(
-                    f"I queried the job sources but found no immediate openings perfectly matching these specific constraints. "
-                    f"Try broadening the keywords or workplace preferences, or subscribe to receive alerts when matching roles appear!"
+                    f"I searched across LinkedIn, Indeed, Glassdoor, and public sources for **{roles_str}**{loc_label}, "
+                    f"but found **0 active openings** meeting your criteria right now.\n\n"
+                    f"Would you like me to broaden the search to remote positions or nearby tech hubs?"
                 )
 
             assistant_content = "\n\n".join(content_parts)

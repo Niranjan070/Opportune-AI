@@ -47,7 +47,36 @@ class DeterministicScoringService:
                     f"Excluded keyword: '{exc_kw}' detected in job listing."
                 ), True
 
-        # 2. Skills Match (35%)
+        # 2. Title Alignment (20%) - Evaluated first to inform skill & domain relevance
+        is_strict_title_mismatch = False
+        if profile.target_titles:
+            title_scores = []
+            GENERIC_TITLE_WORDS = {"engineer", "developer", "specialist", "intern", "internship", "lead", "senior", "junior", "associate", "manager"}
+            for t in profile.target_titles:
+                t_tokens = set(re.findall(r"\w+", t.lower()))
+                j_tokens = set(re.findall(r"\w+", job_title_lower))
+                if t_tokens and j_tokens:
+                    domain_t = t_tokens - GENERIC_TITLE_WORDS
+                    if domain_t:
+                        # Check if any domain token matches
+                        domain_matches = len(domain_t.intersection(j_tokens))
+                        if domain_matches == 0:
+                            # Complete domain mismatch (e.g. 'ai' missing in 'back-end engineer' or 'office assistant')
+                            overlap = 0.10 if t_tokens.intersection(j_tokens) else 0.0
+                        else:
+                            overlap = (domain_matches * 2 + len(t_tokens.intersection(j_tokens))) / (len(domain_t) * 2 + len(t_tokens))
+                    else:
+                        overlap = len(t_tokens.intersection(j_tokens)) / len(t_tokens)
+                    title_scores.append(min(100.0, overlap * 100.0))
+                else:
+                    title_scores.append(0.0)
+            score_title = max(title_scores) if title_scores else 50.0
+            if score_title < 25.0:
+                is_strict_title_mismatch = True
+        else:
+            score_title = 80.0
+
+        # 3. Skills Match (35%)
         matched_skills: List[str] = []
         missing_skills: List[str] = []
 
@@ -74,22 +103,11 @@ class DeterministicScoringService:
                 pattern = r"(?<!\w)" + re.escape(skill) + r"(?!\w)"
                 if re.search(pattern, searchable_text):
                     matched_skills.append(skill.title() if len(skill) > 3 else skill.upper())
-            score_skills = min(100.0, 65.0 + len(matched_skills) * 7.0) if matched_skills else 75.0
 
-        # 3. Title Alignment (20%)
-        if profile.target_titles:
-            title_scores = []
-            for t in profile.target_titles:
-                t_tokens = set(re.findall(r"\w+", t.lower()))
-                j_tokens = set(re.findall(r"\w+", job_title_lower))
-                if t_tokens and j_tokens:
-                    overlap = len(t_tokens.intersection(j_tokens)) / len(t_tokens)
-                    title_scores.append(overlap * 100.0)
-                else:
-                    title_scores.append(0.0)
-            score_title = max(title_scores) if title_scores else 50.0
-        else:
-            score_title = 80.0
+            if is_strict_title_mismatch:
+                score_skills = 25.0
+            else:
+                score_skills = min(100.0, 65.0 + len(matched_skills) * 7.0) if matched_skills else 70.0
 
         # 4. Experience & Seniority (15%)
         profile_exp = (profile.experience_level or "Any").lower()
@@ -118,6 +136,9 @@ class DeterministicScoringService:
         elif profile_exp in ("any", ""):
             score_experience = 90.0
 
+        if is_strict_title_mismatch:
+            score_experience = min(score_experience, 40.0)
+
         # 5. Location & Work Arrangement (15%)
         wp_pref = (profile.workplace_preference or "any").lower()
         score_location = 70.0
@@ -144,20 +165,20 @@ class DeterministicScoringService:
                 from backend.app.services.location_intelligence import resolve_location, compute_geographic_relevance
                 target_loc = resolve_location(" ".join(pref_locs_clean))
                 allow_remote = profile.workplace_preference in ("remote", "hybrid", "any", "all")
-                
+
                 is_acceptable, geo_multiplier, match_reason = compute_geographic_relevance(
                     job.location,
                     target_loc,
                     allow_remote=allow_remote,
                 )
-                
+
                 if not is_acceptable:
                     score_location = 5.0
                 elif "city-match" in match_reason:
                     score_location = 100.0
                 elif "state-match" in match_reason:
                     score_location = 85.0
-                elif "country" in match_reason:
+                elif "country" in match_reason or "europe-match" in match_reason or "remote-europe" in match_reason:
                     score_location = 70.0 if target_loc.search_scope == "city" else 95.0
                 elif "remote" in match_reason:
                     score_location = 75.0 if allow_remote else 30.0
@@ -167,7 +188,7 @@ class DeterministicScoringService:
                 score_location = 85.0
 
         # 6. Domain & Responsibilities (10%)
-        score_domain = 80.0
+        score_domain = 25.0 if is_strict_title_mismatch else 80.0
 
         # 7. Compensation (5%)
         score_comp = 75.0
@@ -183,6 +204,10 @@ class DeterministicScoringService:
             + cls.WEIGHT_DOMAIN * score_domain
             + cls.WEIGHT_COMPENSATION * score_comp
         )
+
+        if is_strict_title_mismatch:
+            total_score = min(total_score, 35.0)
+
         total_score = round(max(0.0, min(100.0, total_score)), 1)
 
         # Tier Classification
@@ -197,12 +222,20 @@ class DeterministicScoringService:
 
         # Generate Evidence Explanation
         explanations = []
+        if is_strict_title_mismatch and profile.target_titles:
+            explanations.append(f"Low role title alignment with '{job.title}'")
+        elif score_title >= 80.0:
+            explanations.append(f"Strong role title alignment with '{job.title}'")
+
         if matched_skills:
-            explanations.append(f"Matched {len(matched_skills)}/{len(profile.skills or matched_skills)} core skills ({', '.join(matched_skills[:4])})")
+            if profile.skills:
+                explanations.append(f"Matched {len(matched_skills)}/{len(profile.skills)} target skills ({', '.join(matched_skills[:4])})")
+            else:
+                explanations.append(f"Tech stack detected: {', '.join(matched_skills[:4])}")
+
         if missing_skills:
             explanations.append(f"Missing desired skills: {', '.join(missing_skills[:3])}")
-        if score_title >= 80.0:
-            explanations.append(f"Strong role title alignment with '{job.title}'")
+
         if job.workplace_type == WorkplaceType.REMOTE and wp_pref == "remote":
             explanations.append("100% Remote match with work preference")
         elif job.location:

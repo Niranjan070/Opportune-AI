@@ -4,6 +4,7 @@ import type { ChatSession, ScoredJob, EmbeddedScoredJob } from '../../types';
 import { ToolAuditAccordion } from './ToolAuditAccordion';
 import { EmbeddedJobCard } from './EmbeddedJobCard';
 import { EmailSubscribeBar } from './EmailSubscribeBar';
+import MorphOrb from '../ui/ai-thiking-orb-and-input';
 
 interface ChatStreamProps {
   session: ChatSession | null;
@@ -106,43 +107,82 @@ export const ChatStream: React.FC<ChatStreamProps> = ({
         }}
       >
         {/* Empty State / Welcome Screen */}
+        {/* Empty State / Welcome Screen with MorphOrb */}
         {messages.length === 0 && !isLoading && (
           <div
             style={{
               margin: 'auto',
-              maxWidth: '680px',
+              maxWidth: '720px',
+              width: '100%',
               textAlign: 'center',
-              padding: '40px 20px',
+              padding: '24px 10px',
             }}
           >
             <div
               style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '18px',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 20px auto',
-                boxShadow: '0 8px 28px rgba(79, 70, 229, 0.45)',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                background: 'rgba(99, 102, 241, 0.12)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                color: '#a5b4fc',
+                fontSize: '12px',
+                fontWeight: 600,
+                marginBottom: '16px',
               }}
             >
-              <Sparkles size={32} color="#ffffff" />
+              <Sparkles size={14} color="#818cf8" />
+              <span>Opportune AI • Autonomous Job Discovery Agent</span>
             </div>
 
-            <h2 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 12px 0', letterSpacing: '-0.02em', color: '#ffffff' }}>
+            <h1
+              style={{
+                fontSize: '32px',
+                fontWeight: 800,
+                margin: '0 0 10px 0',
+                letterSpacing: '-0.025em',
+                color: '#ffffff',
+              }}
+            >
               Where would you like to work next?
-            </h2>
-            <p style={{ color: '#94a3b8', fontSize: '15px', lineHeight: 1.6, margin: '0 0 32px 0' }}>
-              Ask me about any role, city, internship, or company. I intelligently dispatch targeted queries across LinkedIn, Naukri, Indeed, Greenhouse, and Remotive to find your best matches.
+            </h1>
+            <p
+              style={{
+                color: '#94a3b8',
+                fontSize: '14.5px',
+                lineHeight: 1.6,
+                margin: '0 auto 24px auto',
+                maxWidth: '540px',
+              }}
+            >
+              Ask me about any role, city, tech stack, or employer. I dynamically dispatch live MCP tools across LinkedIn, Indeed, Glassdoor, and direct ATS boards.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', textAlign: 'left' }}>
+            <div style={{ margin: '0 auto', width: '100%', maxWidth: '600px' }}>
+              <MorphOrb
+                placeholder="Search roles (e.g. 'Frontend Developer in Chennai', 'AI Engineer in Europe')…"
+                onSubmit={async (prompt) => {
+                  onSelectPrompt(prompt);
+                  return "Dispatching live search tools across LinkedIn, Indeed, and ATS boards...";
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '12px',
+                marginTop: '32px',
+                textAlign: 'left',
+              }}
+            >
               <div
-                onClick={() => onSelectPrompt('AI engineer intern in Coimbatore or Remote')}
+                onClick={() => onSelectPrompt('Frontend Developer role in Chennai')}
                 style={{
-                  padding: '16px',
+                  padding: '14px 16px',
                   borderRadius: '12px',
                   background: 'rgba(22, 32, 50, 0.7)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -152,18 +192,18 @@ export const ChatStream: React.FC<ChatStreamProps> = ({
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.5)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
-                <div style={{ fontWeight: 700, fontSize: '14px', color: '#ffffff', marginBottom: '4px' }}>
-                  🇮🇳 Indian Regional & Internships
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#ffffff', marginBottom: '4px' }}>
+                  🇮🇳 Local City Tech Search
                 </div>
                 <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
-                  "AI engineer intern in Coimbatore or Remote"
+                  "Frontend Developer role in Chennai"
                 </div>
               </div>
 
               <div
-                onClick={() => onSelectPrompt('Remote Machine Learning Engineer at top tech companies')}
+                onClick={() => onSelectPrompt('AI Engineer in Europe with PyTorch')}
                 style={{
-                  padding: '16px',
+                  padding: '14px 16px',
                   borderRadius: '12px',
                   background: 'rgba(22, 32, 50, 0.7)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -173,11 +213,53 @@ export const ChatStream: React.FC<ChatStreamProps> = ({
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.5)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
-                <div style={{ fontWeight: 700, fontSize: '14px', color: '#ffffff', marginBottom: '4px' }}>
-                  🌐 Global Remote ML / AI
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#ffffff', marginBottom: '4px' }}>
+                  🇪🇺 European Tech Hubs
                 </div>
                 <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
-                  "Remote Machine Learning Engineer at top tech companies"
+                  "AI Engineer in Europe with PyTorch"
+                </div>
+              </div>
+
+              <div
+                onClick={() => onSelectPrompt('Remote Senior Python roles at GitLab with FastAPI')}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  background: 'rgba(22, 32, 50, 0.7)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.5)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#ffffff', marginBottom: '4px' }}>
+                  🏢 Direct Employer ATS Search
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
+                  "Remote Senior Python roles at GitLab with FastAPI"
+                </div>
+              </div>
+
+              <div
+                onClick={() => onSelectPrompt('AI engineer intern in Coimbatore or Remote')}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  background: 'rgba(22, 32, 50, 0.7)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.5)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#ffffff', marginBottom: '4px' }}>
+                  🎓 Internship & Early Career
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
+                  "AI engineer intern in Coimbatore or Remote"
                 </div>
               </div>
             </div>
